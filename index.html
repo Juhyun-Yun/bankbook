@@ -1,0 +1,2435 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>우리 반 통장 & 용돈기입장</title>
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Gaegu:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --primary: #3182F6;
+    --primary-hover: #1B64DA;
+    --primary-soft: #E8F1FE;
+    --primary-deep: #0F2C4D;
+    --bg: #DCE6F2;
+    --bg-soft: #F7F4EA;
+    --card: #FFFFFF;
+    --paper: #FBF8EB;
+    --text: #191F28;
+    --text-secondary: #4E5968;
+    --text-muted: #8B95A1;
+    --border: #EAEDF0;
+    --border-strong: #D1D6DB;
+    --positive: #00B894;
+    --positive-soft: #E4F8F3;
+    --negative: #F0506E;
+    --negative-soft: #FDECEE;
+    --warning: #F08C00;
+    --warning-soft: #FFF3DC;
+    --hover: #F6F8FA;
+
+    --radius-xs: 8px;
+    --radius-sm: 10px;
+    --radius: 14px;
+    --radius-lg: 20px;
+    --radius-xl: 24px;
+
+    --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
+    --shadow-sm: 0 2px 6px rgba(15, 23, 42, 0.05);
+    --shadow-md: 0 6px 20px rgba(15, 23, 42, 0.06);
+    --shadow-lg: 0 14px 40px rgba(15, 23, 42, 0.08);
+    --shadow-xl: 0 28px 70px rgba(15, 23, 42, 0.12);
+
+    --text-primary: var(--text);
+    --ink-navy: var(--primary-deep);
+    --gold-foil: var(--primary);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Gowun Dodum', 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+    background:
+      radial-gradient(ellipse at top, rgba(255,255,255,0.4) 0%, transparent 60%),
+      linear-gradient(180deg, #E1EAF4 0%, #C8D5E5 100%);
+    background-attachment: fixed;
+    min-height: 100vh;
+    padding: clamp(12px, 2vw, 24px) clamp(8px, 1.5vw, 16px);
+    color: var(--text);
+    /* 모달·토스트 등 컨테이너 밖 요소용 기본 크기 */
+    font-size: 22px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    letter-spacing: -0.01em;
+  }
+  .container {
+    margin: 0 auto;
+  }
+  /* 로그인 화면 — 통장(1.55:1) 한 장만 보이게, 외곽 카드 없음 */
+  .container.container-login {
+    max-width: 1024px;
+    background: transparent;
+    border-radius: 0;
+    padding: clamp(8px, 2vw, 28px);
+    box-shadow: none;
+  }
+  /* 앱 안 — 큰 한 페이지 (옅은 크림 통장 종이) 화면을 가득 채움
+     container-type 으로 cqw 단위가 컨테이너 너비를 기준으로 동작 →
+     화면 폭이 커지면 글씨도 같은 비율로 커지고, 1280px 에서 멈춤 */
+  .container.container-inner {
+    max-width: 1280px;
+    container-type: inline-size;
+    font-size: clamp(18px, 2.3cqw, 28px);
+    background:
+      repeating-linear-gradient(180deg, transparent 0 30px, rgba(176, 138, 46, 0.04) 30px 31px),
+      linear-gradient(180deg, #FCFAF1 0%, #F6F1DE 100%);
+    border-radius: var(--radius-xl);
+    padding: clamp(20px, 3vw, 44px);
+    box-shadow: var(--shadow-md), 0 0 0 1px rgba(176, 138, 46, 0.12) inset;
+    min-height: calc(100vh - clamp(24px, 4vw, 48px));
+  }
+
+  h1, h2, h3 {
+    color: var(--text);
+    font-family: 'Gaegu', 'Gowun Dodum', sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  h1 { font-size: 1.6em; margin-bottom: 18px; }
+  h2 { font-size: 1.1em; margin: 26px 0 12px; font-weight: 700; }
+  h3 { font-size: 0.98em; margin: 14px 0 10px; font-weight: 600; color: var(--text-secondary); }
+
+  .btn {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 18px;
+    font-size: 0.92em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin: 3px;
+    background: var(--card);
+    color: var(--text);
+    font-family: inherit;
+    letter-spacing: -0.01em;
+  }
+  .btn:hover { background: var(--hover); border-color: var(--border-strong); }
+  .btn-primary { background: var(--primary); color: white; border-color: var(--primary); }
+  .btn-primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
+  .btn-secondary { background: var(--primary-soft); color: var(--primary); border-color: transparent; }
+  .btn-secondary:hover { background: #D5E5FB; }
+  .btn-success { background: var(--positive); color: white; border-color: var(--positive); }
+  .btn-success:hover { background: #00A085; }
+  .btn-warn { background: var(--warning-soft); color: var(--warning); border-color: transparent; }
+  .btn-warn:hover { background: #FFEBC2; }
+  .btn-danger { background: var(--negative-soft); color: var(--negative); border-color: transparent; }
+  .btn-danger:hover { background: #FBDADF; }
+  .btn-ghost { background: transparent; color: var(--text-secondary); border-color: var(--border); }
+  .btn-ghost:hover { background: var(--hover); color: var(--text); }
+  .btn-sm { padding: 6px 12px; font-size: 0.85em; border-radius: var(--radius-xs); }
+
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .center { display: flex; justify-content: center; align-items: center; }
+  .space-between { justify-content: space-between; }
+  .right { display: flex; justify-content: flex-end; }
+
+  .input, select, textarea {
+    padding: 10px 14px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-strong);
+    font-size: 0.95em;
+    outline: none;
+    background: var(--card);
+    font-family: inherit;
+    color: var(--text);
+    transition: border 0.15s, box-shadow 0.15s;
+  }
+  .input:focus, select:focus, textarea:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(49, 130, 246, 0.12);
+  }
+  label { font-size: 0.88em; color: var(--text-secondary); font-weight: 500; display: inline-flex; flex-direction: column; gap: 6px; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 12px;
+    background: transparent;
+    font-size: 0.92em;
+  }
+  th, td {
+    padding: 12px 14px;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+  }
+  th {
+    background: var(--bg-soft);
+    color: var(--text-secondary);
+    font-weight: 600;
+    font-size: 0.85em;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border-strong);
+  }
+  td.num, td.amount, td.balance {
+    font-family: 'Pretendard Variable', Pretendard, sans-serif;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    letter-spacing: -0.01em;
+  }
+  /* 표의 일자 칸 — 내용보다 작은 폰트로 공간 절약 */
+  td.date-col {
+    font-family: 'Pretendard Variable', Pretendard, sans-serif;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.7em;
+    width: 5em;
+    color: var(--text-secondary);
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    padding: 10px 6px;
+  }
+  /* 통장 표(거래/사용 내역)의 셀이 두 줄로 내려가지 않게 — 내용 칸만 wrap 허용 */
+  .bankbook { overflow-x: auto; }
+  .bankbook td, .bankbook th { white-space: nowrap; padding: 10px 8px; }
+  .bankbook td.wrap, .bankbook td.col-desc { white-space: normal; }
+
+  /* 표 안에 들어가는 매우 작은 버튼 (삭제 등) */
+  .btn-xs {
+    padding: 4px 10px;
+    font-size: 0.62em;
+    border-radius: 8px;
+    font-weight: 600;
+  }
+  td input.cell { width: 100%; border: none; padding: 4px 6px; text-align: center; font-family: inherit; background: transparent; }
+  td input.cell:focus { background: var(--hover); border-radius: 4px; }
+
+  .hidden { display: none !important; }
+
+  /* Login — 진짜 파란 통장 디자인 · 스케일 기반 반응형 (가로 1.55:1 비율 고정) */
+  .login-card { text-align: center; padding: 0; }
+
+  .passbook-cover {
+    width: 100%;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 12px 0 24px;
+  }
+
+  /* 통장 본체 — 비율 고정 + 컨테이너 쿼리 베이스 폰트
+     모든 자식은 em 으로 작성 → 카드 폭이 줄면 전부 함께 축소 */
+  .passbook-card {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1.55 / 1;
+    background: linear-gradient(140deg, #6B9BE5 0%, #4A7DD1 40%, #2B5AAD 100%);
+    overflow: hidden;
+    color: white;
+    container-type: inline-size;
+    font-size: clamp(10px, 1.55cqw, 18px);
+    border-radius: 1.8em;
+    box-shadow:
+      0 2.6em 6em rgba(43, 90, 173, 0.40),
+      0 1em 2em rgba(43, 90, 173, 0.22),
+      0 0 0 0.08em rgba(255,255,255,0.10) inset;
+  }
+
+  /* 상단 대각선 줄무늬 */
+  .passbook-card .stripes-diagonal {
+    position: absolute;
+    top: -2.5em;
+    left: -3em;
+    width: 33em;
+    height: 8em;
+    background: repeating-linear-gradient(
+      90deg,
+      transparent 0 0.4em,
+      rgba(255,255,255,0.92) 0.4em 0.8em
+    );
+    transform: rotate(-14deg);
+    transform-origin: top left;
+    border-radius: 0.2em;
+    pointer-events: none;
+  }
+
+  /* 상단 가로 흰 막대(자기띠) — 두 줄 */
+  .passbook-card .magstripe {
+    position: absolute;
+    top: 4.5em;
+    left: 16em;
+    width: 24em;
+    height: 0.42em;
+    background: white;
+    border-radius: 0.15em;
+    box-shadow: 0 1.3em 0 white;
+    pointer-events: none;
+  }
+
+  /* 오른쪽 작은 세로 줄무늬(바코드) */
+  .passbook-card .stripes-right {
+    position: absolute;
+    top: 3.6em;
+    right: 3.8em;
+    width: 10em;
+    height: 3.2em;
+    background: repeating-linear-gradient(
+      90deg,
+      transparent 0 0.3em,
+      white 0.3em 0.72em
+    );
+    border-radius: 0.15em;
+    pointer-events: none;
+  }
+
+  /* 칩 */
+  .passbook-card .chip {
+    position: absolute;
+    left: 5em;
+    top: 8em;
+    display: grid;
+    grid-template-columns: repeat(2, 2.5em);
+    grid-template-rows: repeat(2, 2.5em);
+    gap: 0.7em;
+    transform: rotate(2deg);
+    pointer-events: none;
+  }
+  .passbook-card .chip > span {
+    background: #1F4380;
+    border-radius: 0.5em;
+    box-shadow: 0 0.15em 0 rgba(0,0,0,0.15) inset;
+  }
+
+  /* 콘텐츠 (은행 이름 · 부제 · 폼) — 절대 위치 박스에서 세로 flex
+     top·bottom inset 을 동시에 이동 → 콘텐츠 영역 크기 유지하면서
+     은행 이름부터 입장 버튼까지 전체를 위로 평행이동 (4em ≈ 1.5cm) */
+  .passbook-card .content {
+    position: absolute;
+    inset: 10em 5em 14em 5em;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .passbook-card .bank-display {
+    font-size: 3.4em;
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    line-height: 1.1;
+    color: white;
+    text-shadow: 0 0.08em 0.4em rgba(15, 44, 80, 0.3);
+    margin: 0 0 0.15em;
+  }
+  .passbook-card .bank-sub {
+    font-size: 1em;
+    letter-spacing: 0.22em;
+    color: rgba(255,255,255,0.78);
+    font-weight: 600;
+    margin: 0 0 1.4em;
+  }
+
+  /* 폼 영역 (통장 내부) */
+  .passbook-card .login-form {
+    width: 36em;
+    max-width: 100%;
+    text-align: left;
+    margin-top: auto;
+  }
+  .passbook-card .login-form .owner-label {
+    display: block;
+    color: rgba(255,255,255,0.92);
+    font-size: 1.15em;
+    font-weight: 600;
+    margin-bottom: 0.5em;
+    letter-spacing: -0.01em;
+  }
+  .passbook-card .login-form .owner-select {
+    width: 100%;
+    padding: 0.85em 1.1em;
+    border: 0.1em solid rgba(255,255,255,0.4);
+    border-radius: 0.75em;
+    background: rgba(255,255,255,0.18);
+    color: white;
+    font-size: 1.3em;
+    font-weight: 500;
+    font-family: inherit;
+    backdrop-filter: blur(0.7em);
+    -webkit-backdrop-filter: blur(0.7em);
+    margin-bottom: 0.85em;
+    outline: none;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .passbook-card .login-form .owner-select option {
+    background: white;
+    color: var(--text);
+  }
+  .passbook-card .login-form .owner-select:focus {
+    border-color: white;
+    background: rgba(255,255,255,0.28);
+    box-shadow: 0 0 0 0.2em rgba(255,255,255,0.18);
+  }
+  .passbook-card .login-form .owner-select:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  /* 통장 안 입장 버튼 — 흰 배경 + 짙은 네이비 */
+  .passbook-card .enter-btn {
+    width: 100%;
+    background: white;
+    color: #1B4380;
+    border: none;
+    font-family: inherit;
+    font-size: 1.3em;
+    font-weight: 800;
+    padding: 0.9em;
+    cursor: pointer;
+    border-radius: 0.75em;
+    letter-spacing: -0.01em;
+    box-shadow: 0 0.55em 1.4em rgba(15, 44, 80, 0.22);
+    transition: transform 0.15s, box-shadow 0.15s, background 0.15s;
+  }
+  .passbook-card .enter-btn:hover:not(:disabled) {
+    transform: translateY(-0.08em);
+    background: #F4F8FE;
+    box-shadow: 0 0.8em 1.7em rgba(15, 44, 80, 0.28);
+  }
+  .passbook-card .enter-btn:disabled {
+    background: rgba(255,255,255,0.35);
+    color: rgba(15, 44, 80, 0.55);
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
+  /* BANK 글자 (우측 하단) */
+  .passbook-card .bank-corner {
+    position: absolute;
+    right: 4em;
+    bottom: 1.2em;
+    font-size: 1.8em;
+    font-weight: 900;
+    letter-spacing: 0.15em;
+    color: #1B4380;
+    pointer-events: none;
+  }
+
+  /* 선생님 모드 — BANK 오른쪽, 거의 안 보이는 흐릿한 버튼
+     (호버하면 살짝 진해짐) */
+  .passbook-card .teacher-link {
+    position: absolute;
+    right: 0.3em;
+    bottom: 1.6em;
+    font-size: 0.62em;
+    font-weight: 500;
+    color: rgba(255,255,255,0.4);
+    background: transparent;
+    border: none;
+    padding: 0.3em 0.5em;
+    border-radius: 0.4em;
+    cursor: pointer;
+    font-family: inherit;
+    letter-spacing: -0.01em;
+    transition: color 0.15s, background 0.15s;
+  }
+  .passbook-card .teacher-link:hover {
+    color: white;
+    background: rgba(255,255,255,0.18);
+  }
+
+  .login-card select { font-size: 1.05em; padding: 10px 14px; min-width: 240px; }
+
+  /* Bankbook selection - modern cards */
+  .bookcase {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+    margin-top: 24px;
+  }
+  .book {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 28px 24px;
+    cursor: pointer;
+    position: relative;
+    transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+    box-shadow: var(--shadow-xs);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    min-height: 220px;
+  }
+  .book:hover:not(.locked) {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--border-strong);
+  }
+  .book.locked { opacity: 0.55; cursor: not-allowed; }
+
+  .book.savings .crest { background: linear-gradient(135deg, #3182F6 0%, #1B64DA 100%); box-shadow: 0 8px 20px rgba(49, 130, 246, 0.25); }
+  .book.allowance .crest { background: linear-gradient(135deg, #00B894 0%, #009176 100%); box-shadow: 0 8px 20px rgba(0, 184, 148, 0.25); }
+
+  .book .crest {
+    width: 3.2em; height: 3.2em;
+    border-radius: 0.85em;
+    display: flex; align-items: center; justify-content: center;
+    color: white;
+    font-weight: 800;
+    font-size: 0.95em;
+    letter-spacing: -0.01em;
+    margin-bottom: 0.7em;
+    border: none;
+    flex-shrink: 0;
+  }
+  .book .bank-mark {
+    font-size: 0.78em;
+    color: var(--text-muted);
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+  .book .book-title {
+    font-size: 1.3em;
+    font-weight: 800;
+    color: var(--text);
+    letter-spacing: -0.025em;
+    margin-bottom: 4px;
+  }
+  .book .book-sub {
+    color: var(--text-muted);
+    font-size: 0.85em;
+    font-weight: 500;
+    margin-bottom: 22px;
+  }
+  .book .lockicon {
+    position: absolute; top: 18px; right: 20px;
+    font-size: 0.78em;
+    color: var(--text-muted);
+    font-weight: 600;
+    background: var(--hover);
+    padding: 4px 10px;
+    border-radius: 999px;
+  }
+  .book .open-btn {
+    width: 100%;
+    font-family: inherit;
+    padding: 12px;
+    border: none;
+    background: var(--primary);
+    color: white;
+    font-size: 0.95em;
+    font-weight: 700;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background 0.15s;
+    margin-top: auto;
+    letter-spacing: -0.01em;
+  }
+  .book .open-btn:hover:not(:disabled) { background: var(--primary-hover); }
+  .book .open-btn:disabled { background: var(--border-strong); color: var(--text-muted); cursor: not-allowed; }
+
+  /* Account info strip - 모던 카드 */
+  .account-strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 20px;
+    padding: 20px 24px;
+    border-radius: var(--radius);
+    background: linear-gradient(135deg, #0F2C4D 0%, #1E4571 100%);
+    margin-top: 14px;
+    color: white;
+  }
+  .account-strip .field { display: flex; flex-direction: column; gap: 6px; }
+  .account-strip .label {
+    color: rgba(255,255,255,0.65);
+    font-size: 0.8em;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+  }
+  .account-strip .value {
+    color: white;
+    font-weight: 700;
+    font-size: 1em;
+    letter-spacing: -0.01em;
+  }
+  .account-strip .value.num {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Bankbook page - 모던 원장 */
+  .bankbook {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-top: 16px;
+  }
+  .bankbook h3 {
+    font-size: 0.95em;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 4px;
+    letter-spacing: -0.01em;
+  }
+  .bankbook table { background: transparent; }
+  .bankbook th { background: var(--bg-soft); }
+  .bankbook tr.confirmed td { background: rgba(0, 184, 148, 0.04); }
+  .bankbook td { background: transparent; }
+
+  /* Stamps - 모던 확인 배지 */
+  .stamp {
+    display: inline-flex;
+    flex-direction: column;
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    color: white;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    user-select: none;
+    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.15);
+    transform: rotate(-4deg);
+    line-height: 1;
+    background: var(--positive);
+  }
+  .stamp .ch { font-size: 1.05em; line-height: 1; font-weight: 700; }
+  .stamp .lbl { font-size: 0.58em; font-weight: 600; opacity: 0.92; margin-top: 2px; letter-spacing: -0.01em; }
+  .stamp.s-1 { background: linear-gradient(135deg, #3182F6, #1B64DA); }
+  .stamp.s-2 { background: linear-gradient(135deg, #F0506E, #D63B5B); }
+  .stamp.s-3 { background: linear-gradient(135deg, #00B894, #009176); }
+  .stamp.s-4 { background: linear-gradient(135deg, #F08C00, #D77400); }
+  .stamp.s-5 { background: linear-gradient(135deg, #8B5CF6, #7C3AED); }
+  .stamp.s-6 { background: linear-gradient(135deg, #EC4899, #DB2777); }
+
+  /* Activities setup */
+  .activity-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    margin: 10px 0;
+  }
+  .activity-card .row { gap: 10px; }
+  .activity-card .input { min-width: 0; }
+
+  /* Stats */
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 16px 0; }
+  .stat-tile {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 18px;
+    text-align: left;
+  }
+  .stat-tile .num {
+    font-size: 1.6em;
+    font-weight: 800;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.025em;
+  }
+  .stat-tile .label {
+    color: var(--text-muted);
+    font-size: 0.82em;
+    font-weight: 500;
+    margin-top: 4px;
+  }
+  .bar {
+    height: 8px;
+    background: linear-gradient(90deg, var(--primary), #00B894);
+    border-radius: 99px;
+    transition: width 0.4s ease;
+  }
+  .bar-wrap {
+    background: var(--bg);
+    height: 8px;
+    border-radius: 99px;
+    overflow: hidden;
+  }
+
+  /* Header bar */
+  .topbar {
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 18px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    gap: 8px;
+    box-shadow: var(--shadow-xs);
+  }
+  .topbar .who {
+    display: inline-flex; align-items: center; gap: 10px;
+    font-weight: 700;
+    color: var(--text);
+    font-size: 0.95em;
+    letter-spacing: -0.01em;
+  }
+  .topbar .who .icon {
+    width: 32px; height: 32px;
+    border-radius: 10px;
+    background: var(--primary-soft);
+    color: var(--primary);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-weight: 700;
+    font-size: 0.95em;
+  }
+  .topbar .who .sub { color: var(--text-muted); font-weight: 500; }
+
+  /* Toast */
+  .toast {
+    position: fixed; top: 24px; left: 50%; transform: translateX(-50%);
+    background: var(--text);
+    color: white;
+    padding: 12px 20px;
+    border-radius: var(--radius);
+    z-index: 9999;
+    opacity: 0;
+    transition: opacity .25s ease;
+    pointer-events: none;
+    font-size: 0.92em;
+    font-weight: 500;
+    box-shadow: var(--shadow-lg);
+  }
+  .toast.show { opacity: 1; }
+
+  /* Modal */
+  .modal-bg {
+    position: fixed; inset: 0;
+    background: rgba(15, 23, 42, 0.5);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 5000;
+  }
+  .modal {
+    background: var(--card);
+    border-radius: var(--radius-lg);
+    padding: 28px;
+    min-width: 320px; max-width: 92vw; max-height: 88vh; overflow-y: auto;
+    box-shadow: var(--shadow-xl);
+  }
+
+  /* Teacher panel - 모던 탭 */
+  .tab-bar {
+    display: inline-flex;
+    gap: 4px;
+    margin-bottom: 16px;
+    padding: 4px;
+    background: var(--bg);
+    border-radius: var(--radius-sm);
+  }
+  .tab {
+    padding: 8px 18px;
+    background: transparent;
+    border-radius: var(--radius-xs);
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--text-secondary);
+    font-size: 0.92em;
+    transition: all 0.15s;
+    letter-spacing: -0.01em;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active {
+    background: var(--card);
+    color: var(--primary);
+    box-shadow: var(--shadow-xs);
+  }
+  .panel { background: transparent; padding: 0; }
+
+  /* Guide block */
+  .guide {
+    background: var(--primary-soft);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    margin: 10px 0;
+    color: var(--primary-hover);
+    font-size: 0.92em;
+    line-height: 1.6;
+  }
+  .guide code {
+    background: var(--card);
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-family: 'JetBrains Mono', Pretendard, monospace;
+    font-size: 0.92em;
+    color: var(--text);
+  }
+
+  /* Sync status */
+  .sync-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 0.82em;
+    font-weight: 600;
+    background: var(--primary-soft);
+    color: var(--primary);
+    margin-left: 6px;
+  }
+  .sync-pill.err { background: var(--negative-soft); color: var(--negative); }
+  .sync-pill.ok  { background: var(--positive-soft); color: var(--positive); }
+
+  input[type="checkbox"] {
+    width: 18px; height: 18px;
+    cursor: pointer;
+    accent-color: var(--primary);
+  }
+
+  @keyframes pop {
+    0% { transform: scale(0) rotate(-20deg); opacity: 0; }
+    60% { transform: scale(1.1) rotate(0deg); opacity: 1; }
+    100% { transform: scale(1) rotate(-4deg); opacity: 1; }
+  }
+  .stamp.new { animation: pop .5s ease; }
+
+  /* Income / expense color */
+  .pos { color: var(--positive); font-weight: 700; }
+  .neg { color: var(--negative); font-weight: 700; }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+</style>
+</head>
+<body>
+<div id="app" class="container"></div>
+<div id="toast" class="toast"></div>
+<div id="modal-root"></div>
+
+<script>
+/* ===========================================================================
+ *  데이터 모델 — Apps Script + Google Sheet 가 단일 진실원천
+ *  - 시작 시 google.script.run.getRoster() 로 명단 로드
+ *  - 학생 로그인 시 getStudentData(name) 로 그 학생 데이터 로드
+ *  - 모든 변경은 즉시 시트로 저장(API 호출 + 낙관적 업데이트)
+ * =======================================================================*/
+
+const state = {
+  teacherPassword: '1234',
+  bankName: '우리반은행',
+  settings: {            // 전역 설정 (반 전체에 적용)
+    bankName: '우리반은행',
+    savingsEnabled: true,
+    allowanceEnabled: true,
+  },
+  roster: [],            // [{name, allowanceStart, allowanceEnd}]
+  records: {},           // { [name]: { savings:{activities,records}, allowance:{period,entries} } }
+  meta: null,            // {spreadsheetName, spreadsheetUrl, sheetsInitialized}
+  loading: true,
+  apiReady: false,
+};
+
+function uid() { return 'id_' + Math.random().toString(36).slice(2,10); }
+function saveState() { /* no-op: 시트가 진실원천. UI 호환을 위해 유지 */ }
+
+/* ===========================================================================
+ *  API — google.script.run 래퍼 (Apps Script 환경) / 또는 미연결 안내
+ * =======================================================================*/
+function inAppsScript() {
+  return (typeof google !== 'undefined') && !!google.script && !!google.script.run;
+}
+let isAppsScript = inAppsScript();
+
+// google.script 가 늦게 주입되는 경우를 대비 — 페이지 로드 직후 짧게 polling
+async function waitForAppsScript(timeoutMs = 1500) {
+  if (inAppsScript()) return true;
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    await new Promise(r => setTimeout(r, 50));
+    if (inAppsScript()) { isAppsScript = true; return true; }
+  }
+  return false;
+}
+
+function callGS(fn, ...args) {
+  if (!inAppsScript()) return Promise.reject(new Error('not-in-apps-script'));
+  return new Promise((resolve, reject) => {
+    google.script.run
+      .withSuccessHandler(resolve)
+      .withFailureHandler(err => reject(new Error(err && err.message ? err.message : String(err))))
+      [fn](...args);
+  });
+}
+
+// 일시적 실패에 대비해 자동 재시도 (지수적 대기, 최대 3회)
+async function callGSRetry(fn, ...args) {
+  let lastErr;
+  for (let i = 0; i < 3; i++) {
+    try { return await callGS(fn, ...args); }
+    catch (e) { lastErr = e; await new Promise(r => setTimeout(r, 300 * (i+1))); }
+  }
+  throw lastErr;
+}
+
+const api = {
+  getMeta:               ()           => callGS('getMeta'),
+  initSheets:            ()           => callGS('initSheets'),
+  getRoster:             ()           => callGS('getRoster'),
+  getStudentData:        (n)          => callGS('getStudentData', n),
+  saveSavingsActivity:   (n, a)       => callGS('saveSavingsActivity', n, a),
+  deleteSavingsActivity: (n, id)      => callGS('deleteSavingsActivity', n, id),
+  saveSavingsRecord:     (n, r)       => callGS('saveSavingsRecord', n, r),
+  deleteSavingsRecord:   (n, id)      => callGS('deleteSavingsRecord', n, id),
+  setAllowancePeriod:    (n, s, e)    => callGS('setAllowancePeriod', n, s, e),
+  saveAllowanceEntry:    (n, e)       => callGS('saveAllowanceEntry', n, e),
+  deleteAllowanceEntry:  (n, id)      => callGS('deleteAllowanceEntry', n, id),
+  confirmRecord:         (n,k,id,v)   => callGS('confirmRecord', n, k, id, v),
+  getAllRecords:         ()           => callGS('getAllRecords'),
+  getTeacherPassword:    ()           => callGS('getTeacherPassword'),
+  setTeacherPassword:    (pw)         => callGS('setTeacherPassword', pw),
+  getBankName:           ()           => callGS('getBankName'),
+  setBankName:           (n)          => callGS('setBankName', n),
+  getSpreadsheetId:      ()           => callGS('getSpreadsheetId'),
+  setSpreadsheetId:      (id)         => callGS('setSpreadsheetId', id),
+  getDiagnostic:         ()           => callGS('getDiagnostic'),
+  getSettings:           ()           => callGS('getSettings'),
+  setSetting:            (k,v)        => callGS('setSetting', k, v),
+};
+
+/* API 호출 시 오류는 토스트로 보여주고 콘솔에 기록 */
+function safeCall(fn) {
+  return fn.catch(err => {
+    console.error(err);
+    toast('저장 실패: ' + (err.message||err));
+    throw err;
+  });
+}
+
+async function refreshStudent(name) {
+  try {
+    const d = await api.getStudentData(name);
+    state.records[name] = d;
+  } catch(e) { /* ignore — keep optimistic state */ }
+}
+
+function emptySavings()   { return { activities: [], records: [] }; }
+function emptyAllowance() { return { period: { start: '', end: '' }, entries: [] }; }
+function ensureStudentBucket(name) {
+  let b = state.records[name];
+  if (!b) { state.records[name] = { savings: emptySavings(), allowance: emptyAllowance() }; return state.records[name]; }
+  if (!b.savings || !Array.isArray(b.savings.activities))   b.savings = emptySavings();
+  if (!b.allowance || !Array.isArray(b.allowance.entries) || !b.allowance.period) b.allowance = emptyAllowance();
+  return b;
+}
+async function loadStudentIfNeeded(name) {
+  if (!isAppsScript) return ensureStudentBucket(name);
+  if (state.records[name] && state.records[name]._loaded) return state.records[name];
+  try {
+    const d = await api.getStudentData(name);
+    state.records[name] = Object.assign({_loaded:true}, d);
+  } catch(e) {
+    ensureStudentBucket(name);
+  }
+  return state.records[name];
+}
+function newActivity() {
+  return { id: uid(), name: '', startDate: '', endDate: '', points: 0 };
+}
+function newRecord(activityName, points) {
+  return {
+    id: uid(),
+    date: todayISO(),
+    activityName: activityName || '',
+    points: Number(points) || 0,
+    confirmed: false,
+  };
+}
+function newAllowanceEntry() {
+  return {
+    id: uid(),
+    date: todayISO(),
+    description: '',
+    amount: 0,
+    kind: 'income',          // 'income' | 'expense'
+    incomeType: 'fixed',     // 'fixed' | 'special' (kind==='income' 일 때만 의미 있음)
+    confirmed: false,
+  };
+}
+function todayISO() {
+  const d = new Date();
+  const tz = d.getTimezoneOffset()*60000;
+  return new Date(d - tz).toISOString().slice(0,10);
+}
+
+function rosterFind(name) { return state.roster.find(r => r.name === name); }
+
+/* ===========================================================================
+ *  로컬 미리보기 — file:// 로 열었을 때 Apps Script 가 없으므로
+ *  샘플 데이터를 채워서 모든 화면을 둘러볼 수 있게 한다.
+ *  변경 사항은 메모리에만 남고 새로고침하면 사라집니다.
+ * =======================================================================*/
+function loadSampleData() {
+  state.bankName = '우리반은행';
+  state.teacherPassword = '1234';
+  state.settings = {
+    bankName: '우리반은행',
+    savingsEnabled: true,
+    allowanceEnabled: true,
+  };
+  state.meta = {
+    ok: true,
+    sheetsInitialized: true,
+    spreadsheetName: '(로컬 미리보기)',
+    spreadsheetUrl: '',
+    spreadsheetId: '',
+    boundMode: true,
+    _local: true,
+  };
+  state.roster = [
+    { name: '김민준', allowanceStart:'2025-01-01', allowanceEnd:'2025-12-31' },
+    { name: '이서연', allowanceStart:'', allowanceEnd:'' },
+    { name: '박지호', allowanceStart:'', allowanceEnd:'' },
+    { name: '최서윤', allowanceStart:'', allowanceEnd:'' },
+    { name: '정도윤', allowanceStart:'', allowanceEnd:'' },
+    { name: '강하준', allowanceStart:'', allowanceEnd:'' },
+  ];
+  state.records = {
+    '김민준': {
+      _loaded: true,
+      savings: {
+        activities: [
+          { id:'a1', name:'책 1권 읽기',  startDate:'2025-01-01', endDate:'2025-12-31', points:10 },
+          { id:'a2', name:'운동 30분',    startDate:'2025-01-01', endDate:'2025-12-31', points:5 },
+          { id:'a3', name:'심부름하기',   startDate:'2025-01-01', endDate:'2025-12-31', points:3 },
+        ],
+        records: [
+          { id:'r1', date:'2025-01-05', activityName:'책 1권 읽기', points:10, confirmed:true },
+          { id:'r2', date:'2025-01-12', activityName:'운동 30분',   points:5,  confirmed:true },
+          { id:'r3', date:'2025-01-18', activityName:'심부름하기',  points:3,  confirmed:false },
+        ],
+      },
+      allowance: {
+        period: { start:'2025-01-01', end:'2025-12-31' },
+        entries: [
+          { id:'e1', date:'2025-01-03', description:'새해 용돈',  amount:20000, kind:'income',  incomeType:'special', confirmed:true },
+          { id:'e2', date:'2025-01-05', description:'주간 용돈',  amount:5000,  kind:'income',  incomeType:'fixed',   confirmed:true },
+          { id:'e3', date:'2025-01-08', description:'간식',       amount:1500,  kind:'expense', incomeType:'fixed',   confirmed:false },
+          { id:'e4', date:'2025-01-12', description:'학용품',     amount:3000,  kind:'expense', incomeType:'fixed',   confirmed:true },
+        ],
+      },
+    },
+  };
+}
+
+/* ===========================================================================
+ *  명단 새로고침 (Apps Script API)
+ * =======================================================================*/
+async function refreshRoster({silent=false} = {}) {
+  if (!inAppsScript()) {
+    return { ok:false };
+  }
+  try {
+    const r = await callGSRetry('getRoster');
+    state.roster = r;
+    if (!silent) toast(`명단을 다시 불러왔습니다 (${r.length}명)`);
+    return { ok:true };
+  } catch(e) {
+    console.error('roster load failed', e);
+    if (!silent) toast('명단을 불러오지 못했습니다');
+    return { ok:false };
+  }
+}
+
+/* ===========================================================================
+ *  도장 디자인 - 모던 컬러 배지 (한 글자 + 라벨)
+ * =======================================================================*/
+const STAMP_DESIGNS = [
+  { cls:'s-1', ch:'✓', lbl:'확인' },
+  { cls:'s-2', ch:'★', lbl:'잘함' },
+  { cls:'s-3', ch:'♥', lbl:'멋져' },
+  { cls:'s-4', ch:'✓', lbl:'GOOD' },
+  { cls:'s-5', ch:'✦', lbl:'최고' },
+  { cls:'s-6', ch:'✓', lbl:'완료' },
+];
+function stampFor(recordId, isNew=false) {
+  let h = 0;
+  for (const ch of recordId) h = (h*31 + ch.charCodeAt(0)) >>> 0;
+  const d = STAMP_DESIGNS[h % STAMP_DESIGNS.length];
+  return `<span class="stamp ${d.cls} ${isNew?'new':''}"><span class="ch">${d.ch}</span><span class="lbl">${d.lbl}</span></span>`;
+}
+
+/* ===========================================================================
+ *  원그래프 (SVG) & 금액 포맷
+ * =======================================================================*/
+const PIE_COLORS = ['#FF7043','#42A5F5','#66BB6A','#FFCA28','#AB47BC','#26C6DA','#EC407A','#FFA726','#7E57C2','#26A69A','#9CCC65','#5C6BC0'];
+function fmtMoney(n) { return Number(n||0).toLocaleString('ko-KR'); }
+function pieChart(data, opts={}) {
+  const size = opts.size || 220;
+  const r = size/2 - 6;
+  const cx = size/2, cy = size/2;
+  const total = data.reduce((s,d)=>s+Number(d.value||0), 0);
+  if (total <= 0) {
+    return `<div style="padding:30px;color:var(--text-muted);text-align:center;">데이터가 없어요</div>`;
+  }
+  let angle = -Math.PI/2;
+  const paths = data.map((d, i) => {
+    const v = Number(d.value||0);
+    if (v <= 0) return '';
+    const slice = (v/total) * Math.PI * 2;
+    const x1 = cx + r * Math.cos(angle);
+    const y1 = cy + r * Math.sin(angle);
+    angle += slice;
+    const x2 = cx + r * Math.cos(angle);
+    const y2 = cy + r * Math.sin(angle);
+    const large = slice > Math.PI ? 1 : 0;
+    // 한 항목만 100% 인 경우 path 가 0폭이 되므로 원으로 처리
+    if (data.filter(x=>Number(x.value||0)>0).length === 1) {
+      return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${d.color || PIE_COLORS[i%PIE_COLORS.length]}"/>`;
+    }
+    return `<path d="M ${cx} ${cy} L ${x1.toFixed(2)} ${y1.toFixed(2)} A ${r} ${r} 0 ${large} 1 ${x2.toFixed(2)} ${y2.toFixed(2)} Z" fill="${d.color || PIE_COLORS[i%PIE_COLORS.length]}" stroke="#fff" stroke-width="2"/>`;
+  }).join('');
+  const legend = data.map((d,i)=> {
+    const v = Number(d.value||0);
+    const pct = (v/total*100).toFixed(1);
+    return `
+      <div style="display:flex;align-items:center;gap:8px;margin:4px 0;">
+        <span style="display:inline-block;width:14px;height:14px;background:${d.color||PIE_COLORS[i%PIE_COLORS.length]};border-radius:4px;"></span>
+        <span><b>${escapeHTML(d.label)}</b> · ${fmtMoney(v)}원 · ${pct}%</span>
+      </div>`;
+  }).join('');
+  return `
+    <div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap;justify-content:center;">
+      <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${paths}</svg>
+      <div>${legend}</div>
+    </div>`;
+}
+
+/* ===========================================================================
+ *  토스트 / 모달
+ * =======================================================================*/
+function toast(msg, ms=2000) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(()=>t.classList.remove('show'), ms);
+}
+function openModal(html) {
+  const root = document.getElementById('modal-root');
+  root.innerHTML = `<div class="modal-bg" onclick="if(event.target===this)closeModal()"><div class="modal">${html}</div></div>`;
+}
+function closeModal() { document.getElementById('modal-root').innerHTML = ''; }
+
+/* ===========================================================================
+ *  화면 라우팅
+ * =======================================================================*/
+const view = {
+  current: 'login',
+  studentName: null,
+  bookType: null,
+};
+
+function render() {
+  const root = document.getElementById('app');
+  // 로그인 화면은 통장 비율 모드, 그 외엔 큰 한 페이지 모드
+  root.className = (view.current === 'login')
+    ? 'container container-login'
+    : 'container container-inner';
+  if (view.current === 'login')      return renderLogin(root);
+  if (view.current === 'teacher')    return renderTeacher(root);
+  if (view.current === 'bookSelect') return renderBookSelect(root);
+  if (view.current === 'bankbook') {
+    if (view.bookType === 'allowance') return renderAllowanceBook(root);
+    return renderSavingsBook(root);
+  }
+  if (view.current === 'stats') {
+    if (view.bookType === 'allowance') return renderAllowanceStats(root);
+    return renderSavingsStats(root);
+  }
+}
+
+function topBar(rightHTML='') {
+  const bookLabel = view.bookType === 'savings' ? '적립통장'
+                  : view.bookType === 'allowance' ? '용돈기입장' : '';
+  const nameStr = view.studentName ? escapeHTML(view.studentName) : '';
+  const initial = nameStr ? nameStr.slice(0, 1) : '·';
+  return `
+    <div class="topbar">
+      <div class="who">
+        <span class="icon">${initial}</span>
+        <span>${nameStr}${bookLabel ? ' <span class="sub">· ' + bookLabel + '</span>' : ''}</span>
+      </div>
+      <div>${rightHTML}</div>
+    </div>`;
+}
+
+/* ===========================================================================
+ *  1) 로그인 화면 (시트 명단 드롭다운 + 선생님 모드)
+ * =======================================================================*/
+function renderLogin(root) {
+  const opts = state.roster
+    .map(s => `<option value="${escapeAttr(s.name)}">${escapeHTML(s.name)}</option>`)
+    .join('');
+
+  const hasRoster = state.roster.length > 0;
+  const dropdownHTML = hasRoster
+    ? `<select id="loginSel" class="owner-select">
+         <option value="">— 이름을 선택해 주세요 —</option>${opts}
+       </select>`
+    : `<select id="loginSel" class="owner-select" disabled>
+         <option value="">— 명단 준비 중 —</option>
+       </select>`;
+
+  root.innerHTML = `
+    <div class="passbook-cover">
+      <div class="passbook-card">
+        <div class="stripes-diagonal"></div>
+        <div class="magstripe"></div>
+        <div class="stripes-right"></div>
+        <div class="chip">
+          <span></span><span></span>
+          <span></span><span></span>
+        </div>
+
+        <div class="content">
+          <div class="bank-display">${escapeHTML(state.bankName||'우리반은행')}</div>
+          <div class="bank-sub">SAVINGS · ALLOWANCE BOOK</div>
+
+          <div class="login-form">
+            <label class="owner-label">예금주</label>
+            ${dropdownHTML}
+            <button class="enter-btn" onclick="loginAsStudent()" ${hasRoster?'':'disabled'}>입장하기</button>
+          </div>
+        </div>
+
+        <button class="teacher-link" onclick="askTeacherPassword()">선생님 모드</button>
+        <div class="bank-corner">BANK</div>
+      </div>
+    </div>
+  `;
+}
+async function loginSync() {
+  toast('명단을 불러오는 중…');
+  await refreshRoster();
+  render();
+}
+async function loginAsStudent() {
+  const sel = document.getElementById('loginSel');
+  if (!sel || !sel.value) { toast('이름을 선택해 주세요'); return; }
+  view.studentName = sel.value;
+  toast('데이터를 불러오는 중…');
+  await loadStudentIfNeeded(view.studentName);
+  view.current = 'bookSelect';
+  render();
+}
+function askTeacherPassword() {
+  openModal(`
+    <h2 style="margin-bottom:0;">선생님 인증</h2>
+    <p style="color:var(--text-muted);margin:6px 0 14px;letter-spacing:0.05em;">관리자 비밀번호를 입력해 주세요.</p>
+    <input class="input" id="pwIn" type="password" style="width:100%" placeholder="비밀번호" onkeydown="if(event.key==='Enter')tryTeacherLogin()">
+    <div class="right" style="margin-top:14px;">
+      <button class="btn btn-ghost" onclick="closeModal()">취소</button>
+      <button class="btn btn-primary" onclick="tryTeacherLogin()">입장</button>
+    </div>
+    <p style="font-size:0.78em;color:var(--text-muted);margin-top:10px;">기본 비밀번호: 1234</p>
+  `);
+  setTimeout(()=>document.getElementById('pwIn')?.focus(), 50);
+}
+function tryTeacherLogin() {
+  const v = document.getElementById('pwIn').value;
+  if (v !== state.teacherPassword) { toast('비밀번호가 달라요'); return; }
+  closeModal();
+  view.current = 'teacher';
+  render();
+}
+
+/* ===========================================================================
+ *  2) 선생님 모드
+ * =======================================================================*/
+let teacherTab = 'sheet';   // sheet | records | allstats
+function renderTeacher(root) {
+  root.innerHTML = `
+    <div class="topbar">
+      <div class="who"><span class="icon">▣</span> 선생님 모드 · 관리자 화면</div>
+      <div>
+        <button class="btn" onclick="changeTeacherPassword()">비밀번호 변경</button>
+        <button class="btn" onclick="logout()">로그아웃</button>
+      </div>
+    </div>
+    <div class="tab-bar">
+      <div class="tab ${teacherTab==='sheet'?'active':''}" onclick="teacherTab='sheet';render()">시트 정보</div>
+      <div class="tab ${teacherTab==='records'?'active':''}" onclick="teacherTab='records';refreshTeacherRecords()">실적 확인 · 인장</div>
+      <div class="tab ${teacherTab==='allstats'?'active':''}" onclick="teacherTab='allstats';refreshTeacherStats()">전체 학생 통계</div>
+    </div>
+    <div class="panel" id="panelArea"></div>
+  `;
+  if (teacherTab === 'sheet')    renderTeacherSheet();
+  if (teacherTab === 'records')  renderTeacherRecords();
+  if (teacherTab === 'allstats') renderTeacherAllStats();
+}
+
+async function refreshTeacherStats() {
+  if (isAppsScript) {
+    toast('전체 기록 불러오는 중…');
+    try {
+      state.allRecords = await api.getAllRecords();
+    } catch(e) { toast('불러오기 실패: ' + (e.message||e)); }
+  }
+  render();
+}
+
+function renderTeacherAllStats() {
+  const roster = state.roster || [];
+  const records = state.allRecords || [];
+
+  // 학생별 합계 계산
+  const perStudent = roster.map(s => {
+    const saveRecs = records.filter(r => r.name === s.name && r.kind === 'savings');
+    const saveConfirmed = saveRecs.filter(r => r.confirmed);
+    const savePoints = saveRecs.reduce((sum,r)=>sum+Number(r.amount||0),0);
+    const saveConfirmedPts = saveConfirmed.reduce((sum,r)=>sum+Number(r.amount||0),0);
+
+    const allowRecs = records.filter(r => r.name === s.name && r.kind === 'allowance');
+    const income  = allowRecs.filter(r=>r.entryKind==='income') .reduce((sum,r)=>sum+Number(r.amount||0),0);
+    const expense = allowRecs.filter(r=>r.entryKind==='expense').reduce((sum,r)=>sum+Number(r.amount||0),0);
+
+    return {
+      name: s.name,
+      savePoints, saveConfirmedPts,
+      saveWaiting: savePoints - saveConfirmedPts,
+      income, expense, balance: income - expense,
+      saveCount: saveRecs.length,
+      allowCount: allowRecs.length,
+    };
+  });
+
+  // 학급 합계
+  const totals = perStudent.reduce((a,s)=>({
+    points: a.points + s.saveConfirmedPts,
+    pending: a.pending + s.saveWaiting,
+    income: a.income + s.income,
+    expense: a.expense + s.expense,
+    saveCount: a.saveCount + s.saveCount,
+    allowCount: a.allowCount + s.allowCount,
+  }), { points:0, pending:0, income:0, expense:0, saveCount:0, allowCount:0 });
+
+  // 상위 3명 (확인된 포인트 기준)
+  const topByPoints = [...perStudent]
+    .filter(s=>s.saveConfirmedPts>0)
+    .sort((a,b)=>b.saveConfirmedPts-a.saveConfirmedPts)
+    .slice(0, 3);
+
+  // 학생별 표
+  const sortedRows = [...perStudent].sort((a,b)=>b.saveConfirmedPts-a.saveConfirmedPts);
+  const tableRows = sortedRows.map((s,i)=>`
+    <tr>
+      <td class="num">${i+1}</td>
+      <td>${escapeHTML(s.name)}</td>
+      <td class="num">${fmtMoney(s.saveConfirmedPts)}</td>
+      <td class="num" style="color:var(--text-muted);">${fmtMoney(s.saveWaiting)}</td>
+      <td class="num pos">+${fmtMoney(s.income)}</td>
+      <td class="num neg">-${fmtMoney(s.expense)}</td>
+      <td class="num" style="font-weight:700;color:${s.balance>=0?'var(--primary-deep)':'var(--negative)'};">${fmtMoney(s.balance)}</td>
+      <td class="num" style="color:var(--text-muted);">${s.saveCount + s.allowCount}</td>
+    </tr>
+  `).join('') || `<tr><td colspan="8" style="color:var(--text-muted);">학생 명단이 비어 있습니다.</td></tr>`;
+
+  // 학급 평균
+  const avg = perStudent.length > 0 ? {
+    points: Math.round(totals.points / perStudent.length),
+    income: Math.round(totals.income / perStudent.length),
+    expense: Math.round(totals.expense / perStudent.length),
+  } : { points:0, income:0, expense:0 };
+
+  document.getElementById('panelArea').innerHTML = `
+    <h2>학급 합계</h2>
+    <div class="stat-grid">
+      <div class="stat-tile"><div class="num">${perStudent.length}</div><div class="label">학생 수</div></div>
+      <div class="stat-tile"><div class="num">${fmtMoney(totals.points)}</div><div class="label">학급 확인 포인트</div></div>
+      <div class="stat-tile"><div class="num" style="color:var(--text-muted);">${fmtMoney(totals.pending)}</div><div class="label">확인 대기 포인트</div></div>
+      <div class="stat-tile"><div class="num pos">＋${fmtMoney(totals.income)}</div><div class="label">학급 총 수입</div></div>
+      <div class="stat-tile"><div class="num neg">－${fmtMoney(totals.expense)}</div><div class="label">학급 총 지출</div></div>
+      <div class="stat-tile"><div class="num">${fmtMoney(totals.income - totals.expense)}</div><div class="label">학급 잔액</div></div>
+    </div>
+
+    <h2>학생 1인당 평균</h2>
+    <div class="stat-grid">
+      <div class="stat-tile"><div class="num">${fmtMoney(avg.points)}</div><div class="label">평균 확인 포인트</div></div>
+      <div class="stat-tile"><div class="num pos">+${fmtMoney(avg.income)}</div><div class="label">평균 수입</div></div>
+      <div class="stat-tile"><div class="num neg">-${fmtMoney(avg.expense)}</div><div class="label">평균 지출</div></div>
+      <div class="stat-tile"><div class="num">${totals.saveCount + totals.allowCount}</div><div class="label">전체 기록 수</div></div>
+    </div>
+
+    ${topByPoints.length > 0 ? `
+      <h2>적립 포인트 상위</h2>
+      <div class="row" style="gap:12px;flex-wrap:wrap;margin-top:6px;">
+        ${topByPoints.map((s,i)=>`
+          <div class="stat-tile" style="flex:1;min-width:180px;border-top:3px solid ${['#F08C00','#8B95A1','#B87333'][i]};">
+            <div style="font-size:0.8em;color:var(--text-muted);font-weight:600;">${i+1}위</div>
+            <div style="font-size:1.15em;font-weight:800;color:var(--text);margin-top:2px;">${escapeHTML(s.name)}</div>
+            <div class="num" style="font-size:1.4em;color:var(--primary);font-weight:800;margin-top:6px;">${fmtMoney(s.saveConfirmedPts)} 포인트</div>
+          </div>
+        `).join('')}
+      </div>
+    ` : ''}
+
+    <h2 style="margin-top:24px;">학생별 요약</h2>
+    <p style="color:var(--text-muted);font-size:0.88em;margin-bottom:8px;">적립 포인트(확인) 기준 내림차순 정렬</p>
+    <table>
+      <thead>
+        <tr>
+          <th>순위</th>
+          <th>이름</th>
+          <th>확인 포인트</th>
+          <th>대기 포인트</th>
+          <th>총 수입</th>
+          <th>총 지출</th>
+          <th>잔액</th>
+          <th>기록 수</th>
+        </tr>
+      </thead>
+      <tbody>${tableRows}</tbody>
+    </table>
+
+    <div class="row" style="margin-top:16px;">
+      <button class="btn btn-secondary" onclick="refreshTeacherStats()">새로고침</button>
+    </div>
+  `;
+}
+function changeTeacherPassword() {
+  openModal(`
+    <h2>비밀번호 변경</h2>
+    <input class="input" id="newPw" type="text" style="width:100%" placeholder="새 비밀번호">
+    <div class="right" style="margin-top:12px;">
+      <button class="btn btn-ghost" onclick="closeModal()">취소</button>
+      <button class="btn btn-primary" onclick="doChangePw()">저장</button>
+    </div>
+  `);
+}
+async function doChangePw() {
+  const v = document.getElementById('newPw').value.trim();
+  if (!v) { toast('비밀번호를 입력해 주세요'); return; }
+  state.teacherPassword = v;
+  closeModal();
+  toast('비밀번호를 바꿨어요');
+  if (isAppsScript) {
+    try { await api.setTeacherPassword(v); } catch(e) { toast('시트 저장 실패'); }
+  }
+}
+
+async function saveBankName() {
+  const v = (document.getElementById('bankNameInput').value || '').trim();
+  if (!v) { toast('은행 이름을 입력해 주세요'); return; }
+  state.bankName = v;
+  state.settings.bankName = v;
+  toast('은행 이름을 저장했어요');
+  if (inAppsScript()) {
+    try { await api.setBankName(v); } catch(e) { toast('저장 실패'); }
+  }
+}
+
+async function toggleSetting(key, value) {
+  // 로컬 state 먼저 반영
+  if (key === '적립통장사용')   state.settings.savingsEnabled = value;
+  if (key === '용돈기입장사용') state.settings.allowanceEnabled = value;
+  toast(value ? '사용으로 변경했어요' : '잠금으로 변경했어요');
+  if (inAppsScript()) {
+    try { await api.setSetting(key, value); } catch(e) { toast('설정 저장 실패'); }
+  }
+}
+
+async function saveSheetId() {
+  const v = (document.getElementById('sheetIdInput').value || '').trim();
+  if (!v) { toast('스프레드시트 URL 또는 ID 를 입력해 주세요'); return; }
+  if (!inAppsScript()) { toast('Apps Script 웹앱에서만 동작합니다'); return; }
+  toast('연결 중…');
+  try {
+    const res = await api.setSpreadsheetId(v);
+    if (res && res.ok) {
+      toast('연결됨: ' + (res.name || res.id));
+      await refreshAllTeacher();
+    } else {
+      toast('연결 실패: ' + (res && res.error ? res.error : '알 수 없는 오류'));
+    }
+  } catch(e) {
+    toast('연결 실패: ' + (e.message || e));
+  }
+}
+
+async function clearSheetId() {
+  if (!inAppsScript()) return;
+  if (!confirm('저장된 스프레드시트 ID 를 초기화할까요? 바인딩된 스크립트라면 그 시트로 자동 복귀합니다.')) return;
+  try {
+    await api.setSpreadsheetId('');
+    toast('초기화했어요');
+    await refreshAllTeacher();
+  } catch(e) {
+    toast('초기화 실패');
+  }
+}
+
+async function runDiagnostic() {
+  if (!inAppsScript()) { toast('Apps Script 웹앱에서만 동작합니다'); return; }
+  toast('진단 중…');
+  try {
+    state.diagnostic = await api.getDiagnostic();
+    render();
+  } catch(e) {
+    toast('진단 실패: ' + (e.message||e));
+  }
+}
+
+function renderDiagnosticBlock() {
+  const d = state.diagnostic;
+  if (!d) return '';
+
+  if (!d.connected) {
+    return `
+      <div style="background:var(--negative-soft);border:1px solid var(--negative);border-radius:var(--radius);padding:14px 18px;margin-top:12px;">
+        <b style="color:var(--negative);">연결 실패</b>
+        <div style="margin-top:4px;font-size:0.9em;">${escapeHTML(d.error||'')}</div>
+      </div>`;
+  }
+
+  const using = d.using || {};
+  const expected = d.expectedSheets || [];
+  const rosterInfo = expected.find(s => s.name === '명단') || {};
+
+  // 명단 헤더 비교
+  const headerOk = rosterInfo.headersMatch;
+  const actualH = (rosterInfo.actualHeaders || []).join(' / ');
+  const expectedH = (rosterInfo.expectedHeaders || []).join(' / ');
+
+  // 명단 샘플 행 (헤더 제외 — 첫 행은 헤더)
+  const sample = (d.rosterSample || []).slice(1, 6);
+  const sampleHtml = sample.length === 0
+    ? '<tr><td colspan="5" style="color:var(--text-muted);padding:14px;">— 학생 데이터 없음 —</td></tr>'
+    : sample.map(row => `<tr>${row.slice(0,5).map(c => `<td style="font-size:0.88em;">${escapeHTML(String(c||''))}</td>`).join('')}</tr>`).join('');
+
+  // 모든 시트 탭 상태 요약
+  const sheetStatusRows = expected.map(s => {
+    if (!s.exists) {
+      return `<tr><td>${escapeHTML(s.name)}</td><td><span class="sync-pill err">없음</span></td><td style="color:var(--text-muted);">시트 초기화 필요</td></tr>`;
+    }
+    const headerOk = s.headersMatch;
+    return `
+      <tr>
+        <td><b>${escapeHTML(s.name)}</b></td>
+        <td><span class="sync-pill ok">있음</span> · ${(s.rows||1) - 1} 행</td>
+        <td>${headerOk
+          ? '<span style="color:var(--positive);">헤더 정상</span>'
+          : '<span style="color:var(--negative);">헤더 불일치</span>'}</td>
+      </tr>`;
+  }).join('');
+
+  return `
+    <div style="background:var(--bg-soft);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;margin-top:12px;">
+      <b>현재 연결된 스프레드시트</b>
+      <div style="margin-top:6px;">
+        <a href="${using.url||'#'}" target="_blank" rel="noopener" style="color:var(--primary);font-weight:600;">${escapeHTML(using.name||'')}</a>
+        <span style="color:var(--text-muted);font-size:0.85em;margin-left:8px;">(${d.usingMode==='SAVED_ID'?'저장된 ID':'바인딩'})</span>
+      </div>
+      <div style="font-size:0.82em;color:var(--text-muted);margin-top:4px;word-break:break-all;">ID: ${escapeHTML(using.id||'')}</div>
+      ${d.boundActive && d.usingMode==='SAVED_ID' && d.boundActive.id !== using.id
+        ? `<div style="margin-top:6px;font-size:0.85em;color:var(--warning);">참고: 바인딩된 시트(${escapeHTML(d.boundActive.name)})와 다른 시트를 사용 중</div>`
+        : ''}
+
+      <hr>
+
+      <b>시트 탭 상태</b>
+      <table style="margin-top:8px;">
+        <thead><tr><th style="text-align:left;">시트</th><th style="text-align:left;">상태</th><th style="text-align:left;">비고</th></tr></thead>
+        <tbody>${sheetStatusRows}</tbody>
+      </table>
+
+      <hr>
+
+      <b>명단 시트 상태</b>
+      ${rosterInfo.exists
+        ? `<div style="margin-top:6px;font-size:0.92em;">
+             데이터 행: <b>${d.rosterDataRows||0}명</b>
+             ${headerOk
+               ? '<span class="sync-pill ok" style="margin-left:8px;">헤더 OK</span>'
+               : `<span class="sync-pill err" style="margin-left:8px;">헤더 불일치</span>`}
+           </div>
+           ${!headerOk ? `
+             <div style="margin-top:6px;font-size:0.85em;color:var(--negative);">
+               실제 헤더: <code>${escapeHTML(actualH)}</code><br>
+               기대 헤더: <code>${escapeHTML(expectedH)}</code><br>
+               → 명단 시트 첫 줄을 정확히 <code>이름 / 적립통장잠금 / 용돈기입장잠금 / 용돈기간시작 / 용돈기간종료</code> 로 맞춰주세요.
+             </div>` : ''}
+           <div style="margin-top:10px;font-size:0.88em;color:var(--text-secondary);">처음 5명 미리보기:</div>
+           <table style="margin-top:4px;">${sampleHtml}</table>`
+        : `<div style="margin-top:6px;color:var(--negative);">명단 시트가 없습니다. 위의 <b>시트 초기화</b> 버튼을 눌러주세요.</div>`}
+
+      ${(d.rosterDataRows||0) === 0 && rosterInfo.exists ? `
+        <hr>
+        <div style="background:var(--warning-soft);color:var(--warning);padding:10px 14px;border-radius:var(--radius-sm);margin-top:8px;">
+          <b>안내</b> · 명단에 학생 데이터가 없습니다.
+          위 링크로 스프레드시트를 열어 <code>명단</code> 탭의 <b>이름</b> 열에 학생 이름을 한 줄씩 추가한 뒤, 아래 <b>다시 확인</b>을 눌러주세요.
+        </div>` : ''}
+    </div>`;
+}
+
+/* ---- 시트 정보 ---- */
+function renderTeacherSheet() {
+  const rows = state.roster.map((r,i) => `
+    <tr>
+      <td class="num">${i+1}</td>
+      <td>${escapeHTML(r.name)}</td>
+      <td style="font-size:0.88em;color:var(--text-muted);font-family:'JetBrains Mono',monospace;">${r.allowanceStart||'—'} ~ ${r.allowanceEnd||'—'}</td>
+    </tr>
+  `).join('');
+
+  const m = state.meta;
+  const connectedOk = m && m.ok && m.sheetsInitialized;
+  const connectedNoSheets = m && m.ok && !m.sheetsInitialized;
+  const connectFailed = m && !m.ok;
+
+  let statusHtml;
+  if (!isAppsScript) {
+    statusHtml = `<p style="color:var(--negative);letter-spacing:0.05em;">시트 미연결 · Apps Script 배포 URL로 접속해 주세요</p>`;
+  } else if (connectedOk) {
+    statusHtml = `<p style="color:var(--positive);letter-spacing:0.05em;">시트 연결 · <b>${escapeHTML(m.spreadsheetName||'')}</b></p>`;
+  } else if (connectedNoSheets) {
+    statusHtml = `<p style="color:var(--warning);letter-spacing:0.05em;"><b>${escapeHTML(m.spreadsheetName||'')}</b> 와 연결됨 · 시트 탭 초기화가 필요해요</p>`;
+  } else if (connectFailed) {
+    statusHtml = `
+      <div style="background:var(--negative-soft);border:1px solid var(--negative);border-radius:var(--radius);padding:14px 18px;color:var(--negative);">
+        <b>스프레드시트 연결 실패</b><br>
+        <span style="font-size:0.92em;color:var(--text);">${escapeHTML(m.error||'')}</span>
+      </div>`;
+  } else {
+    statusHtml = `<p style="color:var(--text-muted);">메타 정보를 불러오는 중…</p>`;
+  }
+
+  const openSheetBtn = (m && m.spreadsheetUrl)
+    ? `<a class="btn" target="_blank" rel="noopener" href="${m.spreadsheetUrl}">스프레드시트 열기</a>`
+    : '';
+
+  const currentId = (m && m.spreadsheetId) || '';
+
+  const localNotice = !isAppsScript
+    ? `<div style="background:var(--warning-soft);color:var(--warning);padding:10px 14px;border-radius:var(--radius-sm);margin-bottom:14px;font-size:0.92em;">
+         <b>로컬 미리보기 모드</b> · file:// 또는 정적 페이지로 열렸어요. 시트와 연동되지 않으며 표시되는 데이터는 샘플입니다. 변경 사항은 새로고침하면 사라져요.
+       </div>`
+    : '';
+
+  document.getElementById('panelArea').innerHTML = `
+    ${localNotice}
+    <h2>시트 연결</h2>
+
+    ${statusHtml}
+
+    <div class="row" style="margin-top:10px;">
+      ${openSheetBtn}
+      <button class="btn btn-warn" onclick="doInitSheets()">시트 초기화</button>
+      <button class="btn" onclick="refreshAllTeacher()">다시 확인</button>
+      <button class="btn btn-secondary" onclick="runDiagnostic()">진단 새로고침</button>
+    </div>
+
+    ${renderDiagnosticBlock()}
+
+    <h3 style="margin-top:22px;">스프레드시트 URL/ID 직접 지정</h3>
+    <p style="color:var(--text-muted);font-size:0.9em;margin-bottom:10px;">
+      이미 만든 <b>용돈기입장 스프레드시트</b>의 URL 또는 ID 를 입력하세요.
+      ${m && m.boundMode ? '<br>현재는 시트에 바인딩된 스크립트로 동작 중이라 비워두셔도 돼요.' : ''}
+    </p>
+    <div class="row" style="gap:8px;">
+      <input class="input" id="sheetIdInput" value="${escapeAttr(currentId)}"
+        placeholder="https://docs.google.com/spreadsheets/d/..."
+        style="flex:1;min-width:280px;">
+      <button class="btn btn-primary" onclick="saveSheetId()">연결</button>
+      <button class="btn btn-ghost" onclick="clearSheetId()">초기화</button>
+    </div>
+
+    <h2 style="margin-top:28px;">기능 사용 설정 (반 전체)</h2>
+    <p style="color:var(--text-muted);font-size:0.9em;margin-bottom:10px;">
+      체크된 기능만 학생 화면에 보입니다. 둘 다 켜두면 학생이 선택해서 사용할 수 있고, 한쪽만 켜면 그 기능만 사용해요.<br>
+      이 값은 <code>설정</code> 시트에서 직접 체크박스로 바꿔도 됩니다.
+    </p>
+    <div class="row" style="gap:18px;">
+      <label style="flex-direction:row;align-items:center;gap:8px;">
+        <input type="checkbox" id="settingSavings" ${state.settings.savingsEnabled?'checked':''} onchange="toggleSetting('적립통장사용', this.checked)">
+        <span style="font-size:0.95em;font-weight:600;">적립통장 사용</span>
+      </label>
+      <label style="flex-direction:row;align-items:center;gap:8px;">
+        <input type="checkbox" id="settingAllowance" ${state.settings.allowanceEnabled?'checked':''} onchange="toggleSetting('용돈기입장사용', this.checked)">
+        <span style="font-size:0.95em;font-weight:600;">용돈기입장 사용</span>
+      </label>
+    </div>
+
+    <h2 style="margin-top:28px;">은행 이름</h2>
+    <p style="color:var(--text-muted);font-size:0.9em;margin-bottom:10px;">학생 로그인 화면 통장에 표시되는 이름이에요.</p>
+    <div class="row" style="gap:8px;">
+      <input class="input" id="bankNameInput" value="${escapeAttr(state.bankName||'')}" placeholder="예) 행복초등학교은행" style="flex:1;max-width:360px;">
+      <button class="btn btn-primary" onclick="saveBankName()">저장</button>
+    </div>
+
+    <h3 style="margin-top:24px;">현재 명단</h3>
+    <table>
+      <thead><tr><th>번호</th><th>이름</th><th>용돈 기간</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="3" style="color:var(--text-muted);">명단에 학생이 없습니다.</td></tr>'}</tbody>
+    </table>
+  `;
+
+  // 첫 진입 시 진단 자동 로드 (이미 있으면 skip)
+  if (inAppsScript() && !state.diagnostic) {
+    runDiagnostic();
+  }
+}
+async function doInitSheets() {
+  if (!isAppsScript) { toast('Apps Script 웹앱에서만 동작합니다'); return; }
+  toast('시트를 초기화하는 중…');
+  try {
+    const m = await api.initSheets();
+    state.meta = m;
+    toast('시트를 초기화했어요');
+    render();
+  } catch(e) { toast('초기화 실패: ' + (e.message||e)); }
+}
+async function refreshAllTeacher() {
+  toast('명단을 불러오는 중…');
+  await refreshRoster({silent:true});
+  try { state.meta = await api.getMeta(); } catch(e) {}
+  try { state.diagnostic = await api.getDiagnostic(); } catch(e) {}
+  render();
+}
+
+/* ---- 실적 확인 & 도장 ---- */
+let teacherFilterStudent = '';
+let teacherFilterBook = 'all';
+async function refreshTeacherRecords() {
+  if (!isAppsScript) { render(); return; }
+  try {
+    state.allRecords = await api.getAllRecords();
+  } catch(e) { toast('기록 불러오기 실패: ' + (e.message||e)); }
+  render();
+}
+function renderTeacherRecords() {
+  const opts = state.roster.map(r=>`<option value="${escapeAttr(r.name)}" ${teacherFilterStudent===r.name?'selected':''}>${escapeHTML(r.name)}</option>`).join('');
+  const all = (state.allRecords || []).map(rec => {
+    if (rec.kind === 'savings') {
+      return { ...rec, desc: rec.description, amountText: `${fmtMoney(rec.amount)} 포인트` };
+    }
+    const sub = rec.entryKind === 'income'
+      ? (rec.incomeType==='special'?' [특별 수입]':' [정기 수입]')
+      : ' [지출]';
+    return { ...rec, desc: rec.description + sub, amountText: (rec.entryKind==='income'?'+':'-') + fmtMoney(rec.amount) + '원' };
+  });
+  const filtered = all
+    .filter(x => !teacherFilterStudent || x.name === teacherFilterStudent)
+    .filter(x => teacherFilterBook === 'all' || x.kind === teacherFilterBook)
+    .sort((a,b) => String(b.date).localeCompare(String(a.date)));
+
+  const rows = filtered.map(x => `
+    <tr class="${x.confirmed?'confirmed':''}">
+      <td>${escapeHTML(x.name)}</td>
+      <td>${x.kind==='savings'?'적립통장':'용돈기입장'}</td>
+      <td class="date-col">${x.date}</td>
+      <td style="text-align:left;">${escapeHTML(x.desc)}</td>
+      <td class="num">${x.amountText}</td>
+      <td>
+        <input type="checkbox" ${x.confirmed?'checked':''} onchange="toggleConfirmFromTeacher('${escapeAttr(x.name)}','${x.kind}','${x.id}',this.checked)">
+      </td>
+      <td>${x.confirmed ? stampFor(x.id) : ''}</td>
+    </tr>
+  `).join('');
+
+  document.getElementById('panelArea').innerHTML = `
+    <h2>실적 확인 · 인장 날인</h2>
+    <p style="color:var(--text-muted);letter-spacing:0.05em;">시트의 <code style="font-family:'JetBrains Mono',monospace;">확인</code> 체크박스를 직접 켜셔도 동일하게 인장이 날인됩니다.</p>
+    <div class="row" style="margin:10px 0;">
+      <label>학생
+        <select onchange="teacherFilterStudent=this.value;render()">
+          <option value="">전체</option>${opts}
+        </select>
+      </label>
+      <label>통장
+        <select onchange="teacherFilterBook=this.value;render()">
+          <option value="all" ${teacherFilterBook==='all'?'selected':''}>전체</option>
+          <option value="savings" ${teacherFilterBook==='savings'?'selected':''}>적립통장</option>
+          <option value="allowance" ${teacherFilterBook==='allowance'?'selected':''}>용돈기입장</option>
+        </select>
+      </label>
+      <button class="btn btn-sm" onclick="refreshTeacherRecords()">새로고침</button>
+    </div>
+    <table>
+      <thead>
+        <tr><th>이름</th><th>통장</th><th>일자</th><th>내용</th><th>금액 / 포인트</th><th>확인</th><th>인장</th></tr>
+      </thead>
+      <tbody>${rows || '<tr><td colspan="7" style="color:var(--text-muted);">기록이 없습니다</td></tr>'}</tbody>
+    </table>
+  `;
+}
+async function toggleConfirmFromTeacher(name, kind, id, val) {
+  // local cache
+  const rec = (state.allRecords||[]).find(r => r.name===name && r.kind===kind && r.id===id);
+  if (rec) rec.confirmed = val;
+  toast(val ? '도장을 찍었어요!' : '도장을 지웠어요');
+  if (isAppsScript) {
+    try { await api.confirmRecord(name, kind, id, val); } catch(e) { toast('시트 저장 실패'); }
+  }
+  render();
+}
+async function toggleConfirm(name, kind, recId, val) {
+  const bucket = ensureStudentBucket(name);
+  const list = kind === 'savings' ? bucket.savings.records : bucket.allowance.entries;
+  const r = list.find(x=>x.id===recId);
+  if (r) r.confirmed = val;
+  toast(val ? '도장을 찍었어요!' : '도장을 지웠어요');
+  if (isAppsScript) {
+    try { await api.confirmRecord(name, kind, recId, val); } catch(e) { toast('시트 저장 실패'); }
+  }
+}
+/* 백업 탭은 제거됨 — 시트가 단일 진실원천이므로 백업/복원이 필요 없습니다. */
+
+/* ===========================================================================
+ *  3) 통장 선택 화면
+ * =======================================================================*/
+function renderBookSelect(root) {
+  const meta = rosterFind(view.studentName);
+  if (!meta) {
+    // 시트 명단에서 사라진 경우
+    toast('명단에서 이름을 찾을 수 없어요');
+    view.current = 'login'; render(); return;
+  }
+  // 전역 설정 (반 전체) 으로 잠금 결정
+  const savLocked = !state.settings.savingsEnabled;
+  const aloLocked = !state.settings.allowanceEnabled;
+  const bothLocked = savLocked && aloLocked;
+
+  root.innerHTML = `
+    ${topBar(`<button class="btn btn-ghost" onclick="logout()">로그아웃</button>`)}
+    <h1 style="margin-bottom:6px;">통장 선택</h1>
+    <p style="color:var(--text-muted);margin-bottom:18px;">어떤 통장을 펼쳐볼까요?</p>
+    <div class="bookcase">
+      <div class="book savings ${savLocked?'locked':''}" ${savLocked?'':"onclick=\"openBook('savings')\""}>
+        ${savLocked?'<div class="lockicon">잠금</div>':''}
+        <div class="crest">적립</div>
+        <div class="bank-mark">우리반은행</div>
+        <div class="book-title">적립통장</div>
+        <div class="book-sub">활동을 실천하고 포인트를 모아요</div>
+        <button class="open-btn"
+          ${savLocked?'disabled':''}
+          onclick="event.stopPropagation();openBook('savings')">
+          ${savLocked?'잠겨 있어요':'펼치기'}
+        </button>
+      </div>
+      <div class="book allowance ${aloLocked?'locked':''}" ${aloLocked?'':"onclick=\"openBook('allowance')\""}>
+        ${aloLocked?'<div class="lockicon">잠금</div>':''}
+        <div class="crest">용돈</div>
+        <div class="bank-mark">우리반은행</div>
+        <div class="book-title">용돈기입장</div>
+        <div class="book-sub">수입과 지출을 기록해요</div>
+        <button class="open-btn"
+          ${aloLocked?'disabled':''}
+          onclick="event.stopPropagation();openBook('allowance')">
+          ${aloLocked?'잠겨 있어요':'펼치기'}
+        </button>
+      </div>
+    </div>
+    ${bothLocked ? '<p style="text-align:center;color:var(--negative);margin-top:22px;">선생님이 두 통장을 모두 잠가두었어요</p>' : ''}
+  `;
+}
+function openBook(kind) {
+  view.bookType = kind;
+  view.current = 'bankbook';
+  render();
+}
+
+/* ===========================================================================
+ *  4-A) 적립 통장 (활동 설정 + 기록)
+ * =======================================================================*/
+function renderSavingsBook(root) {
+  const bucket = ensureStudentBucket(view.studentName);
+  const book = bucket.savings;
+  const total = book.records.reduce((a,r)=>a + Number(r.points||0), 0);
+  const confirmedTotal = book.records.filter(r=>r.confirmed).reduce((a,r)=>a+Number(r.points||0),0);
+  const unit = '포인트';
+
+  const otherBtn = state.settings.allowanceEnabled
+    ? `<button class="btn" onclick="openBook('allowance')">용돈기입장</button>` : '';
+  root.innerHTML = `
+    ${topBar(`
+      <button class="btn btn-ghost" onclick="view.current='bookSelect';render()">‹ 통장 선택</button>
+      ${otherBtn}
+      <button class="btn" onclick="view.current='stats';render()">결과 보기</button>
+      <button class="btn btn-ghost" onclick="logout()">로그아웃</button>
+    `)}
+
+    <h1>적립통장</h1>
+
+    <div class="account-strip">
+      <div class="field"><span class="label">예금주</span><span class="value">${escapeHTML(view.studentName)}</span></div>
+      <div class="field"><span class="label">통장종류</span><span class="value">활동적립</span></div>
+      <div class="field"><span class="label">누적</span><span class="value num">${fmtMoney(total)} ${unit}</span></div>
+      <div class="field"><span class="label">확인</span><span class="value num">${fmtMoney(confirmedTotal)} ${unit}</span></div>
+    </div>
+
+    <h2>활동 약정 <span style="font-size:0.78em;color:var(--text-muted);font-weight:400;">(최대 5건 · 기간 및 회당 포인트)</span></h2>
+    <div id="activityList"></div>
+    <div class="row" style="margin-top:8px;">
+      <button class="btn btn-secondary btn-sm" onclick="addActivity()" ${book.activities.length>=5?'disabled style="opacity:.5;cursor:not-allowed"':''}>＋ 활동 추가</button>
+      <span style="color:var(--text-muted);font-size:0.88em;">${book.activities.length} / 5</span>
+    </div>
+
+    <h2>적립 기록</h2>
+    <div class="activity-card">
+      <div class="row" style="align-items: flex-end; gap: 12px;">
+        <label>일자
+          <input class="input" type="date" id="recDate" value="${todayISO()}">
+        </label>
+        <label style="flex:1;min-width:240px;">활동
+          <select class="input" id="recActivity">
+            ${book.activities.length===0
+              ? '<option value="">먼저 활동을 추가해 주세요</option>'
+              : book.activities.map(a=>`<option value="${a.id}">${escapeHTML(a.name||'(이름없음)')}</option>`).join('')
+            }
+          </select>
+        </label>
+        <button class="btn btn-primary" onclick="addRecord()" ${book.activities.length===0?'disabled style="opacity:.5;cursor:not-allowed"':''}>적립 신청</button>
+      </div>
+      <p style="color:var(--text-muted);font-size:0.85em;margin-top:8px;">활동의 약정 기간 안에서만 기록할 수 있어요.</p>
+    </div>
+
+    <div class="bankbook">
+      <h3>거래 내역</h3>
+      ${renderBankbookTable(book, unit)}
+    </div>
+  `;
+  renderActivityList();
+}
+
+/* ===========================================================================
+ *  4-B) 용돈 기입장 (기간 설정 + 수입/지출 원장)
+ * =======================================================================*/
+function renderAllowanceBook(root) {
+  const bucket = ensureStudentBucket(view.studentName);
+  const al = bucket.allowance;
+
+  // 기간이 비어 있으면 기간 설정 화면 먼저
+  if (!al.period.start || !al.period.end) {
+    renderAllowanceSetup(root);
+    return;
+  }
+
+  const inPeriod = al.entries.filter(e => e.date >= al.period.start && e.date <= al.period.end);
+  const sorted = [...inPeriod].sort((a,b)=>a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+
+  let bal = 0;
+  const rows = sorted.map((e, i) => {
+    const signed = e.kind === 'income' ? Number(e.amount||0) : -Number(e.amount||0);
+    bal += signed;
+    const kindBadge = e.kind === 'income'
+      ? `<span class="pos">수입 · ${e.incomeType==='special'?'특별':'정기'}</span>`
+      : `<span class="neg">지출</span>`;
+    return `
+      <tr class="${e.confirmed?'confirmed':''}">
+        <td class="num" style="width:2.4em;">${String(i+1).padStart(2,'0')}</td>
+        <td class="date-col">${e.date}</td>
+        <td class="col-desc" style="text-align:left;">${escapeHTML(e.description)}</td>
+        <td>${kindBadge}</td>
+        <td class="num ${e.kind==='income'?'pos':'neg'}">${e.kind==='income'?'+':'-'}${fmtMoney(e.amount)}</td>
+        <td class="num" style="color:${bal>=0?'var(--ink-navy)':'var(--negative)'};font-weight:600;">${fmtMoney(bal)}</td>
+        <td style="width:4em;">${e.confirmed ? stampFor(e.id) : '<span style="color:var(--text-muted);font-size:0.8em;">확인대기</span>'}</td>
+        <td style="width:3em;"><button class="btn btn-xs btn-ghost" onclick="deleteAllowanceEntry('${e.id}')" ${e.confirmed?'disabled style="opacity:.4;cursor:not-allowed"':''}>삭제</button></td>
+      </tr>`;
+  }).join('');
+
+  const totalIncome  = inPeriod.filter(e=>e.kind==='income') .reduce((s,e)=>s+Number(e.amount||0),0);
+  const totalExpense = inPeriod.filter(e=>e.kind==='expense').reduce((s,e)=>s+Number(e.amount||0),0);
+
+  const otherBtn = state.settings.savingsEnabled
+    ? `<button class="btn" onclick="openBook('savings')">적립통장</button>` : '';
+  root.innerHTML = `
+    ${topBar(`
+      <button class="btn btn-ghost" onclick="view.current='bookSelect';render()">‹ 통장 선택</button>
+      ${otherBtn}
+      <button class="btn" onclick="view.current='stats';render()">통계 보기</button>
+      <button class="btn btn-ghost" onclick="logout()">로그아웃</button>
+    `)}
+
+    <h1>용돈기입장</h1>
+
+    <div class="account-strip">
+      <div class="field"><span class="label">예금주</span><span class="value">${escapeHTML(view.studentName)}</span></div>
+      <div class="field"><span class="label">통장종류</span><span class="value">자유입출금</span></div>
+      <div class="field"><span class="label">기간</span><span class="value num" style="font-size:0.62em;">${al.period.start} ~ ${al.period.end}</span></div>
+      <div class="field"><span class="label">잔액</span><span class="value num">₩ ${fmtMoney(bal)}</span></div>
+    </div>
+
+    <div class="stat-grid" style="grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.4fr) minmax(0, 1.4fr) minmax(0, 0.7fr);">
+      <div class="stat-tile"><div class="num pos">＋${fmtMoney(totalIncome)}</div><div class="label">수입 합계</div></div>
+      <div class="stat-tile"><div class="num neg">－${fmtMoney(totalExpense)}</div><div class="label">지출 합계</div></div>
+      <div class="stat-tile"><div class="num">${fmtMoney(bal)}</div><div class="label">현재 잔액</div></div>
+      <div class="stat-tile"><div class="num">${inPeriod.length}</div><div class="label">사용 건수</div></div>
+    </div>
+
+    <div class="row" style="justify-content:flex-end;margin:8px 0 0;">
+      <button class="btn btn-sm btn-warn" onclick="changeAllowancePeriod()">기간 변경</button>
+    </div>
+
+    <h2>새 사용 내역 입력</h2>
+    <div class="activity-card">
+      <div class="row" style="align-items: flex-end; gap: 12px;">
+        <label>일자 <input class="input" type="date" id="alDate" value="${todayISO()}"></label>
+        <label style="flex:1;min-width:200px;">내용 <input class="input" id="alDesc" placeholder="예) 세뱃돈, 간식, 학용품"></label>
+        <label>금액 <input class="input" type="number" id="alAmount" placeholder="0" min="0" style="width:7em;"></label>
+        <label>구분
+          <select class="input" id="alKind" onchange="toggleIncomeType()">
+            <option value="income">수입</option>
+            <option value="expense">지출</option>
+          </select>
+        </label>
+        <label id="alIncomeTypeWrap">수입구분
+          <select class="input" id="alIncomeType">
+            <option value="fixed">정기 (용돈 등)</option>
+            <option value="special">특별 (세뱃돈, 상금 등)</option>
+          </select>
+        </label>
+        <button class="btn btn-primary" onclick="addAllowanceEntry()">＋ 등록</button>
+      </div>
+      <p style="color:var(--text-muted);font-size:0.85em;margin-top:6px;">설정한 기간 안의 일자로만 등록할 수 있어요.</p>
+    </div>
+
+    <div class="bankbook">
+      <h3>사용 내역</h3>
+      ${sorted.length === 0
+        ? '<p style="color:var(--text-muted);text-align:center;padding:24px;">— 사용 내역 없음 —</p>'
+        : `<table>
+            <thead><tr>
+              <th>No.</th><th>일자</th><th>내용</th><th>구분</th><th>금액(원)</th><th>잔액(원)</th><th>인장</th><th></th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+          </table>`
+      }
+    </div>
+  `;
+}
+
+function renderAllowanceSetup(root) {
+  const today = todayISO();
+  const monthLater = (() => {
+    const d = new Date(); d.setMonth(d.getMonth()+1);
+    const tz = d.getTimezoneOffset()*60000;
+    return new Date(d - tz).toISOString().slice(0,10);
+  })();
+  root.innerHTML = `
+    ${topBar(`<button class="btn btn-ghost" onclick="view.current='bookSelect';render()">‹ 통장 선택</button>`)}
+    <div style="max-width:520px;margin:24px auto 0;">
+      <h1 style="margin-bottom:6px;">용돈기입장 개설</h1>
+      <p style="color:var(--text-muted);margin-bottom:20px;">설정한 기간 안의 일자만 기록할 수 있어요.</p>
+      <div class="activity-card">
+        <div class="row" style="gap:14px;">
+          <label style="flex:1;">시작일 <input class="input" type="date" id="periodStart" value="${today}"></label>
+          <label style="flex:1;">종료일 <input class="input" type="date" id="periodEnd" value="${monthLater}"></label>
+        </div>
+        <div class="right" style="margin-top:14px;">
+          <button class="btn btn-primary" onclick="saveAllowancePeriod()">개설하기</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function saveAllowancePeriod() {
+  const start = document.getElementById('periodStart').value;
+  const end   = document.getElementById('periodEnd').value;
+  if (!start || !end) { toast('시작일과 종료일을 모두 골라주세요'); return; }
+  if (start > end)   { toast('시작일이 종료일보다 늦어요'); return; }
+  const al = ensureStudentBucket(view.studentName).allowance;
+  al.period = { start, end };
+  toast('기간을 정했어요!');
+  render();
+  if (isAppsScript) {
+    try { await api.setAllowancePeriod(view.studentName, start, end); } catch(e) { toast('시트 저장 실패'); }
+  }
+}
+function changeAllowancePeriod() {
+  const al = ensureStudentBucket(view.studentName).allowance;
+  openModal(`
+    <h2 style="margin-bottom:0;">기간 변경</h2>
+    <p style="color:var(--text-muted);margin:6px 0 12px;">기간을 바꿔도 이전 기록은 사라지지 않아요 — 기간 안의 기록만 보입니다.</p>
+    <div class="row">
+      <label>시작일 <input class="input" type="date" id="pStart" value="${al.period.start}"></label>
+      <label>종료일 <input class="input" type="date" id="pEnd"   value="${al.period.end}"></label>
+    </div>
+    <div class="right" style="margin-top:12px;">
+      <button class="btn btn-ghost" onclick="closeModal()">취소</button>
+      <button class="btn btn-primary" onclick="doChangePeriod()">저장</button>
+    </div>
+  `);
+}
+async function doChangePeriod() {
+  const start = document.getElementById('pStart').value;
+  const end   = document.getElementById('pEnd').value;
+  if (!start || !end) { toast('날짜를 모두 골라주세요'); return; }
+  if (start > end) { toast('시작일이 종료일보다 늦어요'); return; }
+  const al = ensureStudentBucket(view.studentName).allowance;
+  al.period = { start, end };
+  closeModal();
+  toast('기간을 바꿨어요');
+  render();
+  if (isAppsScript) {
+    try { await api.setAllowancePeriod(view.studentName, start, end); } catch(e) {}
+  }
+}
+function toggleIncomeType() {
+  const kind = document.getElementById('alKind').value;
+  document.getElementById('alIncomeTypeWrap').style.display = kind === 'income' ? '' : 'none';
+}
+async function addAllowanceEntry() {
+  const al = ensureStudentBucket(view.studentName).allowance;
+  const date = document.getElementById('alDate').value;
+  const desc = document.getElementById('alDesc').value.trim();
+  const amount = Number(document.getElementById('alAmount').value);
+  const kind = document.getElementById('alKind').value;
+  const incomeType = document.getElementById('alIncomeType').value;
+  if (!date) { toast('날짜를 골라주세요'); return; }
+  if (!desc) { toast('내용을 적어주세요'); return; }
+  if (!amount || amount <= 0) { toast('금액을 0보다 크게 입력해 주세요'); return; }
+  if (date < al.period.start || date > al.period.end) {
+    toast('기록 기간(' + al.period.start + ' ~ ' + al.period.end + ') 안의 날짜여야 해요');
+    return;
+  }
+  const e = newAllowanceEntry();
+  e.date = date; e.description = desc; e.amount = amount;
+  e.kind = kind; e.incomeType = (kind==='income' ? incomeType : 'fixed');
+  al.entries.push(e);
+  toast('기록을 추가했어요!');
+  render();
+  if (isAppsScript) {
+    try {
+      const res = await api.saveAllowanceEntry(view.studentName, e);
+      e.id = res.id;
+    } catch(err) { toast('시트 저장 실패'); }
+  }
+}
+async function deleteAllowanceEntry(id) {
+  if (!confirm('이 기록을 삭제할까요?')) return;
+  const al = ensureStudentBucket(view.studentName).allowance;
+  al.entries = al.entries.filter(e => e.id !== id);
+  render();
+  if (isAppsScript) {
+    try { await api.deleteAllowanceEntry(view.studentName, id); } catch(err) {}
+  }
+}
+function renderActivityList() {
+  const bucket = ensureStudentBucket(view.studentName);
+  const book = bucket[view.bookType];
+  const unit = view.bookType === 'savings' ? '포인트' : '원';
+  const html = book.activities.map((a, idx) => `
+    <div class="activity-card">
+      <div class="row">
+        <span style="color:var(--gold-foil);font-weight:700;min-width:24px;text-align:center;">${idx+1}.</span>
+        <input class="input" placeholder="활동 이름 (예: 책 읽기)" value="${escapeAttr(a.name)}" onchange="updActivity('${a.id}','name',this.value)" style="flex:2;min-width:180px;">
+        <label>시작 <input class="input" type="date" value="${a.startDate}" onchange="updActivity('${a.id}','startDate',this.value)"></label>
+        <label>종료 <input class="input" type="date" value="${a.endDate}" onchange="updActivity('${a.id}','endDate',this.value)"></label>
+        <label>${unit}/회 <input class="input" type="number" value="${a.points}" style="width:90px;" onchange="updActivity('${a.id}','points',this.value)"></label>
+        <button class="btn btn-sm btn-danger" onclick="delActivity('${a.id}')">삭제</button>
+      </div>
+    </div>
+  `).join('');
+  document.getElementById('activityList').innerHTML = html || '<p style="color:var(--text-muted);padding:6px 0;">등록된 활동이 없습니다. 추가해 주세요.</p>';
+}
+function renderBankbookTable(book, unit) {
+  const sorted = [...book.records].sort((a,b)=>a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+  let running = 0;
+  if (sorted.length === 0) return '<p style="color:var(--text-muted);text-align:center;padding:24px;">— 거래 내역 없음 —</p>';
+  const rows = sorted.map((r, i) => {
+    running += Number(r.points||0);
+    return `
+      <tr class="${r.confirmed?'confirmed':''}">
+        <td class="num" style="width:2.4em;">${String(i+1).padStart(2,'0')}</td>
+        <td class="date-col">${r.date}</td>
+        <td class="col-desc">${escapeHTML(r.activityName)}</td>
+        <td class="num" style="color:var(--positive);">${fmtMoney(r.points)} ${unit}</td>
+        <td class="num" style="color:var(--ink-navy);font-weight:600;">${fmtMoney(running)} ${unit}</td>
+        <td style="width:4em;">${r.confirmed
+          ? stampFor(r.id)
+          : '<span style="color:var(--text-muted);font-size:0.8em;">확인대기</span>'}
+        </td>
+        <td style="width:3em;"><button class="btn btn-xs btn-ghost" onclick="deleteRecord('${r.id}')" ${r.confirmed?'disabled style="opacity:.4;cursor:not-allowed"':''}>삭제</button></td>
+      </tr>`;
+  }).join('');
+  return `
+    <table>
+      <thead><tr>
+        <th>No.</th><th>일자</th><th>내용</th><th>입금 ${unit}</th><th>잔액 ${unit}</th><th>인장</th><th></th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+async function addActivity() {
+  const book = ensureStudentBucket(view.studentName).savings;
+  if (book.activities.length >= 5) { toast('활동은 최대 5개까지요'); return; }
+  const a = newActivity();
+  book.activities.push(a);
+  render();
+  if (isAppsScript) {
+    try {
+      const r = await api.saveSavingsActivity(view.studentName, a);
+      a.id = r.id;
+    } catch(e) { toast('시트 저장 실패'); }
+  }
+}
+function updActivity(id, field, val) {
+  const book = ensureStudentBucket(view.studentName).savings;
+  const a = book.activities.find(x=>x.id===id);
+  if (!a) return;
+  a[field] = field==='points' ? Number(val) : val;
+  if (isAppsScript) {
+    safeCall(api.saveSavingsActivity(view.studentName, a)).catch(()=>{});
+  }
+}
+async function delActivity(id) {
+  if (!confirm('이 활동을 삭제할까요?')) return;
+  const book = ensureStudentBucket(view.studentName).savings;
+  book.activities = book.activities.filter(a=>a.id!==id);
+  render();
+  if (isAppsScript) {
+    try { await api.deleteSavingsActivity(view.studentName, id); } catch(e) {}
+  }
+}
+async function addRecord() {
+  const book = ensureStudentBucket(view.studentName).savings;
+  const date = document.getElementById('recDate').value;
+  const aid  = document.getElementById('recActivity').value;
+  if (!date) { toast('날짜를 골라주세요'); return; }
+  const a = book.activities.find(x=>x.id===aid);
+  if (!a) { toast('활동을 선택해 주세요'); return; }
+  if (!a.name) { toast('활동 이름을 먼저 적어주세요'); return; }
+  if (a.startDate && date < a.startDate) { toast('활동 시작 전이에요'); return; }
+  if (a.endDate && date > a.endDate)     { toast('활동 기간이 끝났어요'); return; }
+  const r = newRecord(a.name, a.points);
+  r.date = date;
+  book.records.push(r);
+  toast('적립이 신청되었습니다. 선생님 확인을 기다려 주세요.');
+  render();
+  if (isAppsScript) {
+    try {
+      const res = await api.saveSavingsRecord(view.studentName, r);
+      r.id = res.id;
+    } catch(e) { toast('시트 저장 실패'); }
+  }
+}
+async function deleteRecord(id) {
+  if (!confirm('이 기록을 삭제할까요?')) return;
+  const book = ensureStudentBucket(view.studentName).savings;
+  book.records = book.records.filter(r=>r.id!==id);
+  render();
+  if (isAppsScript) {
+    try { await api.deleteSavingsRecord(view.studentName, id); } catch(e) {}
+  }
+}
+
+/* ===========================================================================
+ *  5-A) 적립 통장 통계
+ * =======================================================================*/
+function renderSavingsStats(root) {
+  const bucket = ensureStudentBucket(view.studentName);
+  const book = bucket.savings;
+  const unit = '포인트';
+
+  const total = book.records.reduce((a,r)=>a+Number(r.points||0),0);
+  const confirmed = book.records.filter(r=>r.confirmed);
+  const confirmedTotal = confirmed.reduce((a,r)=>a+Number(r.points||0),0);
+  const waiting = book.records.length - confirmed.length;
+  const days = new Set(book.records.map(r=>r.date)).size;
+
+  const byAct = {};
+  book.records.forEach(r => {
+    byAct[r.activityName] = (byAct[r.activityName] || 0) + Number(r.points||0);
+  });
+  const max = Math.max(1, ...Object.values(byAct));
+  const actRows = Object.entries(byAct)
+    .sort((a,b)=>b[1]-a[1])
+    .map(([name, val]) => `
+      <div style="margin:8px 0;">
+        <div class="row space-between"><b>${escapeHTML(name)}</b><span>${val} ${unit}</span></div>
+        <div class="bar-wrap"><div class="bar" style="width:${(val/max*100).toFixed(1)}%;"></div></div>
+      </div>
+    `).join('') || '<p style="color:var(--text-muted);">기록이 없어요</p>';
+
+  root.innerHTML = `
+    ${topBar(`
+      <button class="btn btn-ghost" onclick="view.current='bankbook';render()">‹ 통장으로</button>
+      <button class="btn btn-ghost" onclick="logout()">로그아웃</button>
+    `)}
+    <h1>${escapeHTML(view.studentName)} · 적립 결산</h1>
+    <div class="stat-grid">
+      <div class="stat-tile"><div class="num">${fmtMoney(total)}</div><div class="label">전체 누적 ${unit}</div></div>
+      <div class="stat-tile"><div class="num">${fmtMoney(confirmedTotal)}</div><div class="label">확인 ${unit}</div></div>
+      <div class="stat-tile"><div class="num">${book.records.length}</div><div class="label">거래 건수</div></div>
+      <div class="stat-tile"><div class="num">${waiting}</div><div class="label">확인 대기</div></div>
+      <div class="stat-tile"><div class="num">${days}</div><div class="label">실천 일수</div></div>
+      <div class="stat-tile"><div class="num">${confirmed.length}</div><div class="label">받은 인장</div></div>
+    </div>
+
+    <h2>활동별 적립 ${unit}</h2>
+    ${actRows}
+
+    <h2>인장 모음</h2>
+    <div style="display:flex;flex-wrap:wrap;gap:20px;padding:10px 4px;">
+      ${confirmed.length === 0
+        ? '<p style="color:var(--text-muted);">받은 인장이 없습니다. 활동을 실천하고 선생님 확인을 받아보세요.</p>'
+        : confirmed.map(r => `
+            <div style="text-align:center;">
+              ${stampFor(r.id)}
+              <div style="font-size:0.78em;color:var(--text-muted);margin-top:6px;">${r.date}<br>${escapeHTML(r.activityName)}</div>
+            </div>`).join('')
+      }
+    </div>
+  `;
+}
+
+/* ===========================================================================
+ *  5-B) 용돈 기입장 통계 (수입/지출 원그래프)
+ * =======================================================================*/
+function renderAllowanceStats(root) {
+  const bucket = ensureStudentBucket(view.studentName);
+  const al = bucket.allowance;
+  const inPeriod = (al.period.start && al.period.end)
+    ? al.entries.filter(e => e.date >= al.period.start && e.date <= al.period.end)
+    : al.entries.slice();
+
+  const income  = inPeriod.filter(e=>e.kind==='income');
+  const expense = inPeriod.filter(e=>e.kind==='expense');
+  const totalIncome  = income.reduce((s,e)=>s+Number(e.amount||0),0);
+  const totalExpense = expense.reduce((s,e)=>s+Number(e.amount||0),0);
+  const balance = totalIncome - totalExpense;
+
+  // 수입: 고정 vs 특별
+  const fixed   = income.filter(e=>e.incomeType==='fixed')  .reduce((s,e)=>s+Number(e.amount||0),0);
+  const special = income.filter(e=>e.incomeType==='special').reduce((s,e)=>s+Number(e.amount||0),0);
+  const incomePie = pieChart([
+    { label:'정기 수입', value:fixed,   color:'#1f5a36' },
+    { label:'특별 수입', value:special, color:'#b08a2e' },
+  ]);
+
+  // 지출: 항목(내용)별 합계
+  const byDesc = {};
+  expense.forEach(e => {
+    const k = e.description || '(내용없음)';
+    byDesc[k] = (byDesc[k]||0) + Number(e.amount||0);
+  });
+  const expenseData = Object.entries(byDesc)
+    .sort((a,b)=>b[1]-a[1])
+    .map(([label,value], i) => ({ label, value, color: PIE_COLORS[i % PIE_COLORS.length] }));
+  const expensePie = pieChart(expenseData);
+
+  root.innerHTML = `
+    ${topBar(`
+      <button class="btn btn-ghost" onclick="view.current='bankbook';render()">‹ 통장으로</button>
+      <button class="btn btn-ghost" onclick="logout()">로그아웃</button>
+    `)}
+    <h1>${escapeHTML(view.studentName)} · 용돈 결산</h1>
+    <p style="text-align:center;color:var(--text-muted);letter-spacing:0.08em;">
+      ${al.period.start && al.period.end
+        ? `기간 <b style="color:var(--ink-navy);">${al.period.start} ~ ${al.period.end}</b>`
+        : '기간이 설정되지 않았습니다'}
+    </p>
+
+    <div class="stat-grid" style="grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.4fr) minmax(0, 1.4fr) minmax(0, 0.7fr);">
+      <div class="stat-tile"><div class="num pos">＋${fmtMoney(totalIncome)}</div><div class="label">총 수입</div></div>
+      <div class="stat-tile"><div class="num neg">－${fmtMoney(totalExpense)}</div><div class="label">총 지출</div></div>
+      <div class="stat-tile"><div class="num" style="color:${balance>=0?'var(--ink-navy)':'var(--negative)'};">${fmtMoney(balance)}</div><div class="label">잔액</div></div>
+      <div class="stat-tile"><div class="num">${inPeriod.length}</div><div class="label">사용 건수</div></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:18px;margin-top:10px;">
+      <div class="activity-card">
+        <h2 style="margin-top:0;">수입 구성 (정기·특별)</h2>
+        ${incomePie}
+      </div>
+      <div class="activity-card">
+        <h2 style="margin-top:0;">지출 구성 (내용별)</h2>
+        ${expensePie}
+      </div>
+    </div>
+  `;
+}
+
+/* ===========================================================================
+ *  공용
+ * =======================================================================*/
+function logout() {
+  view.studentName = null;
+  view.bookType = null;
+  view.current = 'login';
+  render();
+}
+function escapeHTML(s) {
+  return String(s ?? '').replace(/[&<>"']/g, ch => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[ch]));
+}
+function escapeAttr(s) { return escapeHTML(s); }
+
+/* ===========================================================================
+ *  앱 시작
+ * =======================================================================*/
+function renderLoading() {
+  const root = document.getElementById('app');
+  root.className = 'container container-login';
+  root.innerHTML = `
+    <div class="passbook-cover">
+      <div class="passbook-card">
+        <div class="stripes-diagonal"></div>
+        <div class="magstripe"></div>
+        <div class="stripes-right"></div>
+        <div class="chip">
+          <span></span><span></span>
+          <span></span><span></span>
+        </div>
+        <div class="content">
+          <div class="bank-display">${escapeHTML(state.bankName||'우리반은행')}</div>
+          <div class="bank-sub">SAVINGS · ALLOWANCE BOOK</div>
+          <div class="login-form" style="margin-top:auto;">
+            <p style="color:rgba(255,255,255,0.85);text-align:center;font-size:1.1em;padding:0.5em 0;">불러오는 중…</p>
+          </div>
+        </div>
+        <div class="bank-corner">BANK</div>
+      </div>
+    </div>`;
+}
+
+(async () => {
+  renderLoading();
+
+  // 로컬(file://)·정적 호스팅이면 즉시 샘플 로드. google.script 가
+  // 늦게 주입되는 케이스만 짧게 폴링 (Apps Script 같은 신호가 있을 때만).
+  const hasGoogleStub = (typeof google !== 'undefined');
+  if (hasGoogleStub) await waitForAppsScript();
+
+  if (!inAppsScript()) {
+    console.info('[로컬 미리보기] Apps Script 가 감지되지 않아 샘플 데이터를 로드합니다.');
+    loadSampleData();
+    console.info('[로컬 미리보기] 명단:', state.roster.map(r => r.name).join(', '));
+    state.loading = false;
+    render();
+    return;
+  }
+
+  // 시트 연결이 끊겨도 메타 정보(연결 오류 상세)는 받아둬야 선생님이 진단할 수 있음.
+  // Promise.allSettled 로 각 호출의 성공/실패를 독립적으로 처리한다.
+  const results = await Promise.allSettled([
+    callGSRetry('getMeta'),
+    callGSRetry('getRoster'),
+    callGSRetry('getTeacherPassword'),
+    callGSRetry('getSettings'),
+  ]);
+  const [metaR, rosterR, pwR, settingsR] = results;
+  if (metaR.status === 'fulfilled') state.meta = metaR.value;
+  else state.meta = { ok:false, error: metaR.reason && metaR.reason.message || String(metaR.reason) };
+  if (rosterR.status === 'fulfilled') state.roster = rosterR.value || [];
+  if (pwR.status === 'fulfilled') state.teacherPassword = pwR.value || '1234';
+  if (settingsR.status === 'fulfilled') {
+    state.settings = settingsR.value || state.settings;
+    state.bankName = state.settings.bankName || '우리반은행';
+  }
+  results.forEach((r, i) => {
+    if (r.status === 'rejected') console.error('initial load[' + i + '] failed:', r.reason);
+  });
+
+  state.loading = false;
+  state.apiReady = true;
+  render();
+})();
+</script>
+</body>
+</html>
