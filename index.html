@@ -64,6 +64,13 @@
     line-height: 1.45;
     -webkit-font-smoothing: antialiased;
     letter-spacing: -0.01em;
+    /* 한국어 — 단어 중간에서 줄바꿈되지 않도록 (어절 단위로만 줄바꿈) */
+    word-break: keep-all;
+    overflow-wrap: break-word;
+  }
+  p, h1, h2, h3, label, td, th, button, .activity-card, .stat-tile, textarea, .input {
+    word-break: keep-all;
+    overflow-wrap: break-word;
   }
   .container {
     margin: 0 auto;
@@ -202,6 +209,36 @@
     border-radius: 8px;
     font-weight: 600;
   }
+
+  /* 사용 내역 표의 '구분' 배지 — 한 줄 안에 들어가도록 작게 */
+  .kind-tag { font-size: 0.62em; font-weight: 700; letter-spacing: -0.02em; white-space: nowrap; }
+  .kind-tag .sub { font-size: 0.9em; opacity: 0.78; font-weight: 600; }
+
+  /* 별점 입력 (필요도 평가) */
+  .stars { display: inline-flex; gap: 4px; }
+  .stars .star {
+    cursor: pointer;
+    font-size: 1.4em;
+    color: #D8D8D8;
+    transition: color 0.1s, transform 0.1s;
+    user-select: none;
+    line-height: 1;
+  }
+  .stars .star.on { color: #F2B860; }
+  .stars .star:hover { transform: scale(1.15); }
+  .stars-small { font-size: 0.65em; }
+  .stars-small .star { font-size: 1.05em; }
+
+  /* 일괄 삭제 도구바 */
+  .bulk-bar {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px;
+    background: var(--bg-soft);
+    border-radius: var(--radius-sm);
+    margin-bottom: 8px;
+    font-size: 0.85em;
+  }
+  .bulk-bar .selected-count { color: var(--text-secondary); font-weight: 600; }
   td input.cell { width: 100%; border: none; padding: 4px 6px; text-align: center; font-family: inherit; background: transparent; }
   td input.cell:focus { background: var(--hover); border-radius: 4px; }
 
@@ -621,6 +658,15 @@
     padding: 18px 18px;
     text-align: left;
   }
+  /* 4종 색상 구분 — 한눈에 보이도록 */
+  .stat-tile.tile-income  { background: #E4F8F3; border-color: #5BDDC0; }
+  .stat-tile.tile-expense { background: #FDECEE; border-color: #F4859A; }
+  .stat-tile.tile-balance { background: #E8F1FE; border-color: #79A8F6; }
+  .stat-tile.tile-count   { background: #FFF3DC; border-color: #F2B860; }
+  .stat-tile.tile-income .label,
+  .stat-tile.tile-expense .label,
+  .stat-tile.tile-balance .label,
+  .stat-tile.tile-count .label { color: var(--text-secondary); }
   .stat-tile .num {
     font-size: 1.6em;
     font-weight: 800;
@@ -661,21 +707,21 @@
   }
   .topbar .who {
     display: inline-flex; align-items: center; gap: 10px;
-    font-weight: 700;
-    color: var(--text);
     font-size: 0.95em;
     letter-spacing: -0.01em;
   }
-  .topbar .who .icon {
-    width: 32px; height: 32px;
-    border-radius: 10px;
-    background: var(--primary-soft);
-    color: var(--primary);
-    display: inline-flex; align-items: center; justify-content: center;
-    font-weight: 700;
-    font-size: 0.95em;
+  /* 학생 이름을 버튼/뱃지 형태로 — 한눈에 누구의 화면인지 보이게 */
+  .topbar .name-badge {
+    background: var(--primary);
+    color: white;
+    font-weight: 800;
+    padding: 0.45em 1em;
+    border-radius: 99px;
+    box-shadow: 0 2px 6px rgba(49, 130, 246, 0.25);
+    font-size: 1.05em;
+    letter-spacing: -0.01em;
   }
-  .topbar .who .sub { color: var(--text-muted); font-weight: 500; }
+  .topbar .who .sub { color: var(--text-secondary); font-weight: 600; }
 
   /* Toast */
   .toast {
@@ -887,6 +933,11 @@ const api = {
   getDiagnostic:         ()           => callGS('getDiagnostic'),
   getSettings:           ()           => callGS('getSettings'),
   setSetting:            (k,v)        => callGS('setSetting', k, v),
+  getExpensePlan:        (n)          => callGS('getExpensePlan', n),
+  setExpensePlan:        (n,p)        => callGS('setExpensePlan', n, p),
+  getReflection:         (n)          => callGS('getReflection', n),
+  setReflection:         (n,t)        => callGS('setReflection', n, t),
+  createGuide:           ()           => callGS('createGuide'),
 };
 
 /* API 호출 시 오류는 토스트로 보여주고 콘솔에 기록 */
@@ -920,6 +971,15 @@ async function loadStudentIfNeeded(name) {
   try {
     const d = await api.getStudentData(name);
     state.records[name] = Object.assign({_loaded:true}, d);
+    // 지출 계획·소감 함께 로드
+    try {
+      const plan = await api.getExpensePlan(name);
+      if (state.records[name].allowance) state.records[name].allowance._plan = plan || '';
+    } catch(_) {}
+    try {
+      const reflect = await api.getReflection(name);
+      if (state.records[name].allowance) state.records[name].allowance._reflection = reflect || '';
+    } catch(_) {}
   } catch(e) {
     ensureStudentBucket(name);
   }
@@ -946,8 +1006,13 @@ function newAllowanceEntry() {
     kind: 'income',          // 'income' | 'expense'
     incomeType: 'fixed',     // 'fixed' | 'special' (kind==='income' 일 때만 의미 있음)
     confirmed: false,
+    category: '',            // 지출일 때 항목 (문구·간식·학용품·책 등)
+    necessity: 0,            // 1~5 (지출일 때 자기 평가, 0=미평가)
   };
 }
+
+// 지출 카테고리 — 그래프에서 항목별로 묶을 때 사용
+const EXPENSE_CATEGORIES = ['문구', '간식', '학용품', '책', '기부', '옷', '장난감', '게임', '교통', '기타'];
 function todayISO() {
   const d = new Date();
   const tz = d.getTimezoneOffset()*60000;
@@ -955,6 +1020,94 @@ function todayISO() {
 }
 
 function rosterFind(name) { return state.roster.find(r => r.name === name); }
+
+/* ===========================================================================
+ *  용돈기입장 — 일괄 선택 상태 & 별점 입력 UI 헬퍼
+ * =======================================================================*/
+const selection = { allow: new Set(), save: new Set() };
+
+function renderStars(value, opts = {}) {
+  const onChange = opts.onChange || '';
+  const cls = opts.small ? 'stars stars-small' : 'stars';
+  let html = `<span class="${cls}" data-value="${value||0}">`;
+  for (let i = 1; i <= 5; i++) {
+    const on = i <= (value||0);
+    html += onChange
+      ? `<span class="star ${on?'on':''}" onclick="${onChange}(${i})">★</span>`
+      : `<span class="star ${on?'on':''}">★</span>`;
+  }
+  html += '</span>';
+  return html;
+}
+
+let _necessityInput = 0;
+function setNecessity(v) {
+  _necessityInput = Number(v) || 0;
+  const wrap = document.getElementById('alNecessity');
+  if (wrap) wrap.innerHTML = renderStars(_necessityInput, { onChange: 'setNecessity' });
+}
+
+function toggleAllowanceSelect(id, checked) {
+  if (checked) selection.allow.add(id); else selection.allow.delete(id);
+  updateBulkBar('allow');
+}
+function toggleSavingsSelect(id, checked) {
+  if (checked) selection.save.add(id); else selection.save.delete(id);
+  updateBulkBar('save');
+}
+function updateBulkBar(kind) {
+  const set = kind === 'allow' ? selection.allow : selection.save;
+  const bar = document.getElementById(kind === 'allow' ? 'allowBulkBar' : 'saveBulkBar');
+  if (!bar) return;
+  const countEl = bar.querySelector('.selected-count');
+  const btn = bar.querySelector('button');
+  if (countEl) countEl.textContent = set.size > 0 ? `${set.size}개 선택됨` : '선택된 항목 없음';
+  if (btn) btn.disabled = set.size === 0;
+}
+
+async function saveReflection() {
+  const el = document.getElementById('reflectionInput');
+  if (!el) return;
+  const text = (el.value || '').trim();
+  const al = ensureStudentBucket(view.studentName).allowance;
+  al._reflection = text;
+  toast(text ? '내 생각을 저장했어요!' : '내용을 비웠어요');
+  if (isAppsScript) {
+    try { await api.setReflection(view.studentName, text); } catch(e) { toast('저장 실패'); }
+  }
+}
+
+async function bulkDeleteAllowance() {
+  const ids = Array.from(selection.allow);
+  if (ids.length === 0) return;
+  if (!confirm(`선택한 ${ids.length}개 기록을 삭제할까요? 도장이 찍힌 기록은 빼고 삭제됩니다.`)) return;
+  const al = ensureStudentBucket(view.studentName).allowance;
+  for (const id of ids) {
+    const e = al.entries.find(x => x.id === id);
+    if (!e || e.confirmed) continue;
+    al.entries = al.entries.filter(x => x.id !== id);
+    if (isAppsScript) { try { await api.deleteAllowanceEntry(view.studentName, id); } catch(_) {} }
+  }
+  selection.allow.clear();
+  toast('삭제했어요');
+  render();
+}
+
+async function bulkDeleteSavings() {
+  const ids = Array.from(selection.save);
+  if (ids.length === 0) return;
+  if (!confirm(`선택한 ${ids.length}개 기록을 삭제할까요? 도장이 찍힌 기록은 빼고 삭제됩니다.`)) return;
+  const book = ensureStudentBucket(view.studentName).savings;
+  for (const id of ids) {
+    const r = book.records.find(x => x.id === id);
+    if (!r || r.confirmed) continue;
+    book.records = book.records.filter(x => x.id !== id);
+    if (isAppsScript) { try { await api.deleteSavingsRecord(view.studentName, id); } catch(_) {} }
+  }
+  selection.save.clear();
+  toast('삭제했어요');
+  render();
+}
 
 /* ===========================================================================
  *  로컬 미리보기 — file:// 로 열었을 때 Apps Script 가 없으므로
@@ -991,6 +1144,8 @@ function loadSampleData() {
       _loaded: true,
       savings: {
         activities: [
+          { id:'ac1', name:'아침 줄넘기',  startDate:'2025-01-01', endDate:'2025-12-31', points:5, isCommon:true },
+          { id:'ac2', name:'식사 후 정리', startDate:'2025-01-01', endDate:'2025-12-31', points:3, isCommon:true },
           { id:'a1', name:'책 1권 읽기',  startDate:'2025-01-01', endDate:'2025-12-31', points:10 },
           { id:'a2', name:'운동 30분',    startDate:'2025-01-01', endDate:'2025-12-31', points:5 },
           { id:'a3', name:'심부름하기',   startDate:'2025-01-01', endDate:'2025-12-31', points:3 },
@@ -1003,11 +1158,12 @@ function loadSampleData() {
       },
       allowance: {
         period: { start:'2025-01-01', end:'2025-12-31' },
+        _plan: '간식 5000원, 문구 3000원, 책 4000원 — 꼭 필요한 것만!',
         entries: [
-          { id:'e1', date:'2025-01-03', description:'새해 용돈',  amount:20000, kind:'income',  incomeType:'special', confirmed:true },
-          { id:'e2', date:'2025-01-05', description:'주간 용돈',  amount:5000,  kind:'income',  incomeType:'fixed',   confirmed:true },
-          { id:'e3', date:'2025-01-08', description:'간식',       amount:1500,  kind:'expense', incomeType:'fixed',   confirmed:false },
-          { id:'e4', date:'2025-01-12', description:'학용품',     amount:3000,  kind:'expense', incomeType:'fixed',   confirmed:true },
+          { id:'e1', date:'2025-01-03', description:'새해 용돈',  amount:20000, kind:'income',  incomeType:'special', confirmed:true,  category:'', necessity:0 },
+          { id:'e2', date:'2025-01-05', description:'주간 용돈',  amount:5000,  kind:'income',  incomeType:'fixed',   confirmed:true,  category:'', necessity:0 },
+          { id:'e3', date:'2025-01-08', description:'초콜릿',      amount:1500,  kind:'expense', incomeType:'fixed',   confirmed:false, category:'간식', necessity:2 },
+          { id:'e4', date:'2025-01-12', description:'샤프펜슬',    amount:3000,  kind:'expense', incomeType:'fixed',   confirmed:true,  category:'문구', necessity:5 },
         ],
       },
     },
@@ -1145,12 +1301,11 @@ function topBar(rightHTML='') {
   const bookLabel = view.bookType === 'savings' ? '적립통장'
                   : view.bookType === 'allowance' ? '용돈기입장' : '';
   const nameStr = view.studentName ? escapeHTML(view.studentName) : '';
-  const initial = nameStr ? nameStr.slice(0, 1) : '·';
   return `
     <div class="topbar">
       <div class="who">
-        <span class="icon">${initial}</span>
-        <span>${nameStr}${bookLabel ? ' <span class="sub">· ' + bookLabel + '</span>' : ''}</span>
+        ${nameStr ? `<span class="name-badge">${nameStr}</span>` : ''}
+        ${bookLabel ? `<span class="sub">${bookLabel}</span>` : ''}
       </div>
       <div>${rightHTML}</div>
     </div>`;
@@ -1195,7 +1350,6 @@ function renderLogin(root) {
           </div>
         </div>
 
-        <button class="teacher-link" onclick="askTeacherPassword()">선생님 모드</button>
         <div class="bank-corner">BANK</div>
       </div>
     </div>
@@ -1619,6 +1773,7 @@ function renderTeacherSheet() {
       <button class="btn btn-warn" onclick="doInitSheets()">시트 초기화</button>
       <button class="btn" onclick="refreshAllTeacher()">다시 확인</button>
       <button class="btn btn-secondary" onclick="runDiagnostic()">진단 새로고침</button>
+      <button class="btn" onclick="doCreateGuide()">📘 선생님 가이드 시트 다시 만들기</button>
     </div>
 
     ${renderDiagnosticBlock()}
@@ -1634,6 +1789,11 @@ function renderTeacherSheet() {
         style="flex:1;min-width:280px;">
       <button class="btn btn-primary" onclick="saveSheetId()">연결</button>
       <button class="btn btn-ghost" onclick="clearSheetId()">초기화</button>
+    </div>
+
+    <div class="guide" style="margin-top:18px;">
+      <b>공통 활동 일괄 지정</b>
+      <p style="margin:6px 0 0;">스프레드시트의 <code>적립_활동</code> 시트에서 <b>학생이름</b> 칸을 <code>공통</code>으로 입력하면 그 활동이 모든 학생의 적립통장에 자동으로 표시돼요. 학생은 그 활동을 수정·삭제할 수 없고, 본인이 정한 활동(최대 5개)을 추가로 만들 수 있어요.</p>
     </div>
 
     <h2 style="margin-top:28px;">기능 사용 설정 (반 전체)</h2>
@@ -1680,6 +1840,15 @@ async function doInitSheets() {
     toast('시트를 초기화했어요');
     render();
   } catch(e) { toast('초기화 실패: ' + (e.message||e)); }
+}
+
+async function doCreateGuide() {
+  if (!isAppsScript) { toast('Apps Script 웹앱에서만 동작합니다'); return; }
+  toast('선생님 가이드 시트를 만드는 중…');
+  try {
+    await api.createGuide();
+    toast('가이드 시트를 스프레드시트 맨 앞에 만들었어요!');
+  } catch(e) { toast('실패: ' + (e.message||e)); }
 }
 async function refreshAllTeacher() {
   toast('명단을 불러오는 중…');
@@ -1860,11 +2029,11 @@ function renderSavingsBook(root) {
       <div class="field"><span class="label">확인</span><span class="value num">${fmtMoney(confirmedTotal)} ${unit}</span></div>
     </div>
 
-    <h2>활동 약정 <span style="font-size:0.78em;color:var(--text-muted);font-weight:400;">(최대 5건 · 기간 및 회당 포인트)</span></h2>
+    <h2>활동 약정 <span style="font-size:0.78em;color:var(--text-muted);font-weight:400;">(선생님 공통 + 내가 정한 최대 5개)</span></h2>
     <div id="activityList"></div>
     <div class="row" style="margin-top:8px;">
-      <button class="btn btn-secondary btn-sm" onclick="addActivity()" ${book.activities.length>=5?'disabled style="opacity:.5;cursor:not-allowed"':''}>＋ 활동 추가</button>
-      <span style="color:var(--text-muted);font-size:0.88em;">${book.activities.length} / 5</span>
+      <button class="btn btn-secondary btn-sm" onclick="addActivity()" ${book.activities.filter(a=>!a.isCommon).length>=5?'disabled style="opacity:.5;cursor:not-allowed"':''}>＋ 내가 정한 활동 추가</button>
+      <span style="color:var(--text-muted);font-size:0.88em;">내가 정한 활동 ${book.activities.filter(a=>!a.isCommon).length} / 5</span>
     </div>
 
     <h2>적립 기록</h2>
@@ -1915,18 +2084,26 @@ function renderAllowanceBook(root) {
     const signed = e.kind === 'income' ? Number(e.amount||0) : -Number(e.amount||0);
     bal += signed;
     const kindBadge = e.kind === 'income'
-      ? `<span class="pos">수입 · ${e.incomeType==='special'?'특별':'정기'}</span>`
-      : `<span class="neg">지출</span>`;
+      ? `<span class="kind-tag pos">수입<span class="sub"> · ${e.incomeType==='special'?'특별':'정기'}</span></span>`
+      : `<span class="kind-tag neg">지출</span>`;
+    const descCell = e.kind === 'expense' && e.category
+      ? `${escapeHTML(e.description)} <span style="color:var(--primary);font-size:0.7em;background:var(--primary-soft);padding:2px 8px;border-radius:99px;margin-left:4px;">${escapeHTML(e.category)}</span>`
+      : escapeHTML(e.description);
+    const necessityCell = e.kind === 'expense'
+      ? renderStars(e.necessity, { small: true })
+      : '';
+    const checked = selection.allow.has(e.id) ? 'checked' : '';
     return `
       <tr class="${e.confirmed?'confirmed':''}">
-        <td class="num" style="width:2.4em;">${String(i+1).padStart(2,'0')}</td>
+        <td style="width:2em;"><input type="checkbox" ${e.confirmed?'disabled':''} ${checked} onchange="toggleAllowanceSelect('${e.id}', this.checked)"></td>
+        <td class="num" style="width:2.2em;">${String(i+1).padStart(2,'0')}</td>
         <td class="date-col">${e.date}</td>
-        <td class="col-desc" style="text-align:left;">${escapeHTML(e.description)}</td>
+        <td class="col-desc" style="text-align:left;">${descCell}</td>
         <td>${kindBadge}</td>
         <td class="num ${e.kind==='income'?'pos':'neg'}">${e.kind==='income'?'+':'-'}${fmtMoney(e.amount)}</td>
         <td class="num" style="color:${bal>=0?'var(--ink-navy)':'var(--negative)'};font-weight:600;">${fmtMoney(bal)}</td>
+        <td style="width:5em;">${necessityCell}</td>
         <td style="width:4em;">${e.confirmed ? stampFor(e.id) : '<span style="color:var(--text-muted);font-size:0.8em;">확인대기</span>'}</td>
-        <td style="width:3em;"><button class="btn btn-xs btn-ghost" onclick="deleteAllowanceEntry('${e.id}')" ${e.confirmed?'disabled style="opacity:.4;cursor:not-allowed"':''}>삭제</button></td>
       </tr>`;
   }).join('');
 
@@ -1953,22 +2130,21 @@ function renderAllowanceBook(root) {
     </div>
 
     <div class="stat-grid" style="grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.4fr) minmax(0, 1.4fr) minmax(0, 0.7fr);">
-      <div class="stat-tile"><div class="num pos">＋${fmtMoney(totalIncome)}</div><div class="label">수입 합계</div></div>
-      <div class="stat-tile"><div class="num neg">－${fmtMoney(totalExpense)}</div><div class="label">지출 합계</div></div>
-      <div class="stat-tile"><div class="num">${fmtMoney(bal)}</div><div class="label">현재 잔액</div></div>
-      <div class="stat-tile"><div class="num">${inPeriod.length}</div><div class="label">사용 건수</div></div>
+      <div class="stat-tile tile-income"><div class="num pos">＋${fmtMoney(totalIncome)}</div><div class="label">수입 합계</div></div>
+      <div class="stat-tile tile-expense"><div class="num neg">－${fmtMoney(totalExpense)}</div><div class="label">지출 합계</div></div>
+      <div class="stat-tile tile-balance"><div class="num">${fmtMoney(bal)}</div><div class="label">현재 잔액</div></div>
+      <div class="stat-tile tile-count"><div class="num">${inPeriod.length}</div><div class="label">사용 건수</div></div>
     </div>
 
-    <div class="row" style="justify-content:flex-end;margin:8px 0 0;">
-      <button class="btn btn-sm btn-warn" onclick="changeAllowancePeriod()">기간 변경</button>
+    <div class="row" style="justify-content:flex-end;margin:10px 0 0;">
+      <button class="btn" onclick="changeAllowancePeriod()" style="background:#F08C00;color:white;border-color:#F08C00;font-weight:700;font-size:1em;padding:12px 22px;box-shadow:0 4px 12px rgba(240,140,0,0.32);">
+        📅 기간 · 지출 계획 변경
+      </button>
     </div>
 
     <h2>새 사용 내역 입력</h2>
     <div class="activity-card">
       <div class="row" style="align-items: flex-end; gap: 12px;">
-        <label>일자 <input class="input" type="date" id="alDate" value="${todayISO()}"></label>
-        <label style="flex:1;min-width:200px;">내용 <input class="input" id="alDesc" placeholder="예) 세뱃돈, 간식, 학용품"></label>
-        <label>금액 <input class="input" type="number" id="alAmount" placeholder="0" min="0" style="width:7em;"></label>
         <label>구분
           <select class="input" id="alKind" onchange="toggleIncomeType()">
             <option value="income">수입</option>
@@ -1981,24 +2157,43 @@ function renderAllowanceBook(root) {
             <option value="special">특별 (세뱃돈, 상금 등)</option>
           </select>
         </label>
+        <label>일자 <input class="input" type="date" id="alDate" value="${todayISO()}"></label>
+        <label style="flex:1;min-width:180px;">내용
+          <input class="input" id="alDesc" placeholder="예) 초콜릿, 샤프, 세뱃돈">
+        </label>
+        <label id="alCategoryWrap" style="display:none;">분류
+          <select class="input" id="alCategory">
+            ${EXPENSE_CATEGORIES.map(c=>`<option value="${c}">${c}</option>`).join('')}
+          </select>
+        </label>
+        <label>금액 <input class="input" type="number" id="alAmount" placeholder="0" min="0" style="width:7em;"></label>
+        <label id="alNecessityWrap" style="display:none;">필요도
+          <span id="alNecessity">${renderStars(0, { onChange: 'setNecessity' })}</span>
+        </label>
         <button class="btn btn-primary" onclick="addAllowanceEntry()">＋ 등록</button>
       </div>
-      <p style="color:var(--text-muted);font-size:0.85em;margin-top:6px;">설정한 기간 안의 일자로만 등록할 수 있어요.</p>
+      <p style="color:var(--text-muted);font-size:0.85em;margin-top:6px;">지출은 <b>실제 산 물건/내용</b>을 적고, 그게 어떤 <b>분류</b>(간식·문구 등)인지 골라요. 그래프는 분류별로 보입니다.</p>
     </div>
 
     <div class="bankbook">
       <h3>사용 내역</h3>
       ${sorted.length === 0
         ? '<p style="color:var(--text-muted);text-align:center;padding:24px;">— 사용 내역 없음 —</p>'
-        : `<table>
+        : `<div class="bulk-bar" id="allowBulkBar">
+             <span class="selected-count">선택된 항목 없음</span>
+             <button class="btn btn-sm btn-danger" onclick="bulkDeleteAllowance()" disabled>선택 항목 삭제</button>
+           </div>
+           <table>
             <thead><tr>
-              <th>No.</th><th>일자</th><th>내용</th><th>구분</th><th>금액(원)</th><th>잔액(원)</th><th>인장</th><th></th>
+              <th></th><th>No.</th><th>일자</th><th>내용</th><th>구분</th><th>금액(원)</th><th>잔액(원)</th><th>필요도</th><th>확인</th>
             </tr></thead>
             <tbody>${rows}</tbody>
           </table>`
       }
     </div>
   `;
+  // 폼 초기 상태 동기화 (지출이면 카테고리/별점 표시)
+  toggleIncomeType();
 }
 
 function renderAllowanceSetup(root) {
@@ -2008,16 +2203,23 @@ function renderAllowanceSetup(root) {
     const tz = d.getTimezoneOffset()*60000;
     return new Date(d - tz).toISOString().slice(0,10);
   })();
+  const al = ensureStudentBucket(view.studentName).allowance;
+  const plan = al._plan || '';
   root.innerHTML = `
     ${topBar(`<button class="btn btn-ghost" onclick="view.current='bookSelect';render()">‹ 통장 선택</button>`)}
-    <div style="max-width:520px;margin:24px auto 0;">
+    <div style="max-width:680px;margin:24px auto 0;">
       <h1 style="margin-bottom:6px;">용돈기입장 개설</h1>
-      <p style="color:var(--text-muted);margin-bottom:20px;">설정한 기간 안의 일자만 기록할 수 있어요.</p>
+      <p style="color:var(--text-muted);margin-bottom:20px;">기간을 정하고, <b>이번 기간 동안 어디에 얼마나 쓰고 싶은지 계획</b>도 함께 적어보세요.</p>
       <div class="activity-card">
         <div class="row" style="gap:14px;">
           <label style="flex:1;">시작일 <input class="input" type="date" id="periodStart" value="${today}"></label>
           <label style="flex:1;">종료일 <input class="input" type="date" id="periodEnd" value="${monthLater}"></label>
         </div>
+        <label style="display:block;margin-top:14px;">
+          나의 지출 계획
+          <textarea class="input" id="expensePlan" rows="4" placeholder="예) 간식 5000원, 문구 3000원, 책 2000원 / 꼭 필요한 것만 사기" style="width:100%;resize:vertical;margin-top:6px;">${escapeHTML(plan)}</textarea>
+        </label>
+        <p style="color:var(--text-muted);font-size:0.85em;margin-top:6px;">계획은 결산 화면에서 다시 볼 수 있어요. 마음껏 자유롭게 적어요.</p>
         <div class="right" style="margin-top:14px;">
           <button class="btn btn-primary" onclick="saveAllowancePeriod()">개설하기</button>
         </div>
@@ -2029,25 +2231,33 @@ function renderAllowanceSetup(root) {
 async function saveAllowancePeriod() {
   const start = document.getElementById('periodStart').value;
   const end   = document.getElementById('periodEnd').value;
+  const plan  = (document.getElementById('expensePlan')?.value || '').trim();
   if (!start || !end) { toast('시작일과 종료일을 모두 골라주세요'); return; }
   if (start > end)   { toast('시작일이 종료일보다 늦어요'); return; }
   const al = ensureStudentBucket(view.studentName).allowance;
   al.period = { start, end };
-  toast('기간을 정했어요!');
+  al._plan = plan;
+  toast('기간과 지출 계획을 저장했어요!');
   render();
   if (isAppsScript) {
     try { await api.setAllowancePeriod(view.studentName, start, end); } catch(e) { toast('시트 저장 실패'); }
+    try { await api.setExpensePlan(view.studentName, plan); } catch(e) {}
   }
 }
 function changeAllowancePeriod() {
   const al = ensureStudentBucket(view.studentName).allowance;
+  const plan = al._plan || '';
   openModal(`
-    <h2 style="margin-bottom:0;">기간 변경</h2>
+    <h2 style="margin-bottom:0;">기간 · 지출 계획 변경</h2>
     <p style="color:var(--text-muted);margin:6px 0 12px;">기간을 바꿔도 이전 기록은 사라지지 않아요 — 기간 안의 기록만 보입니다.</p>
     <div class="row">
       <label>시작일 <input class="input" type="date" id="pStart" value="${al.period.start}"></label>
       <label>종료일 <input class="input" type="date" id="pEnd"   value="${al.period.end}"></label>
     </div>
+    <label style="display:block;margin-top:12px;">
+      나의 지출 계획
+      <textarea class="input" id="pPlan" rows="4" style="width:100%;resize:vertical;margin-top:6px;">${escapeHTML(plan)}</textarea>
+    </label>
     <div class="right" style="margin-top:12px;">
       <button class="btn btn-ghost" onclick="closeModal()">취소</button>
       <button class="btn btn-primary" onclick="doChangePeriod()">저장</button>
@@ -2057,39 +2267,65 @@ function changeAllowancePeriod() {
 async function doChangePeriod() {
   const start = document.getElementById('pStart').value;
   const end   = document.getElementById('pEnd').value;
+  const plan  = (document.getElementById('pPlan')?.value || '').trim();
   if (!start || !end) { toast('날짜를 모두 골라주세요'); return; }
   if (start > end) { toast('시작일이 종료일보다 늦어요'); return; }
   const al = ensureStudentBucket(view.studentName).allowance;
   al.period = { start, end };
+  al._plan = plan;
   closeModal();
-  toast('기간을 바꿨어요');
+  toast('저장했어요');
   render();
   if (isAppsScript) {
     try { await api.setAllowancePeriod(view.studentName, start, end); } catch(e) {}
+    try { await api.setExpensePlan(view.studentName, plan); } catch(e) {}
   }
 }
 function toggleIncomeType() {
   const kind = document.getElementById('alKind').value;
-  document.getElementById('alIncomeTypeWrap').style.display = kind === 'income' ? '' : 'none';
+  const isIncome = kind === 'income';
+  const show = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
+  show('alIncomeTypeWrap', isIncome);
+  show('alCategoryWrap', !isIncome);
+  show('alNecessityWrap', !isIncome);
+  const descInput = document.getElementById('alDesc');
+  if (descInput) {
+    descInput.placeholder = isIncome
+      ? '예) 세뱃돈, 용돈, 상금'
+      : '예) 초콜릿, 샤프, 학습지';
+  }
 }
 async function addAllowanceEntry() {
   const al = ensureStudentBucket(view.studentName).allowance;
   const date = document.getElementById('alDate').value;
-  const desc = document.getElementById('alDesc').value.trim();
-  const amount = Number(document.getElementById('alAmount').value);
   const kind = document.getElementById('alKind').value;
   const incomeType = document.getElementById('alIncomeType').value;
+  const amount = Number(document.getElementById('alAmount').value);
+  const desc = (document.getElementById('alDesc').value || '').trim();
+  let category = '';
+  let necessity = 0;
+  if (kind === 'expense') {
+    category = (document.getElementById('alCategory').value || '').trim();
+    necessity = _necessityInput || 0;
+  }
   if (!date) { toast('날짜를 골라주세요'); return; }
-  if (!desc) { toast('내용을 적어주세요'); return; }
+  if (!desc) { toast('실제 사용한 내용을 적어주세요'); return; }
+  if (kind === 'expense' && !category) { toast('지출 분류를 골라주세요'); return; }
   if (!amount || amount <= 0) { toast('금액을 0보다 크게 입력해 주세요'); return; }
   if (date < al.period.start || date > al.period.end) {
     toast('기록 기간(' + al.period.start + ' ~ ' + al.period.end + ') 안의 날짜여야 해요');
     return;
   }
+  if (kind === 'expense' && necessity === 0) {
+    if (!confirm('필요도(별점)를 입력하지 않았어요. 그대로 등록할까요?')) return;
+  }
   const e = newAllowanceEntry();
   e.date = date; e.description = desc; e.amount = amount;
   e.kind = kind; e.incomeType = (kind==='income' ? incomeType : 'fixed');
+  e.category = category;
+  e.necessity = necessity;
   al.entries.push(e);
+  _necessityInput = 0;
   toast('기록을 추가했어요!');
   render();
   if (isAppsScript) {
@@ -2112,19 +2348,43 @@ function renderActivityList() {
   const bucket = ensureStudentBucket(view.studentName);
   const book = bucket[view.bookType];
   const unit = view.bookType === 'savings' ? '포인트' : '원';
-  const html = book.activities.map((a, idx) => `
-    <div class="activity-card">
-      <div class="row">
-        <span style="color:var(--gold-foil);font-weight:700;min-width:24px;text-align:center;">${idx+1}.</span>
-        <input class="input" placeholder="활동 이름 (예: 책 읽기)" value="${escapeAttr(a.name)}" onchange="updActivity('${a.id}','name',this.value)" style="flex:2;min-width:180px;">
-        <label>시작 <input class="input" type="date" value="${a.startDate}" onchange="updActivity('${a.id}','startDate',this.value)"></label>
-        <label>종료 <input class="input" type="date" value="${a.endDate}" onchange="updActivity('${a.id}','endDate',this.value)"></label>
-        <label>${unit}/회 <input class="input" type="number" value="${a.points}" style="width:90px;" onchange="updActivity('${a.id}','points',this.value)"></label>
-        <button class="btn btn-sm btn-danger" onclick="delActivity('${a.id}')">삭제</button>
-      </div>
-    </div>
-  `).join('');
-  document.getElementById('activityList').innerHTML = html || '<p style="color:var(--text-muted);padding:6px 0;">등록된 활동이 없습니다. 추가해 주세요.</p>';
+
+  const html = book.activities.map((a, idx) => {
+    if (a.isCommon) {
+      // 선생님이 일괄로 지정한 공통 활동 — 학생이 수정·삭제 불가
+      return `
+        <div class="activity-card" style="background: var(--primary-soft); border-left: 4px solid var(--primary);">
+          <div class="row" style="align-items:center;">
+            <span style="color:var(--primary);font-weight:800;min-width:28px;text-align:center;">★</span>
+            <span style="flex:2;min-width:180px;font-weight:700;color:var(--text);">
+              ${escapeHTML(a.name)}
+              <span style="font-size:0.75em;color:var(--primary);font-weight:600;margin-left:6px;">선생님이 정한 공통 활동</span>
+            </span>
+            <span style="color:var(--text-secondary);">기간: ${a.startDate||'-'} ~ ${a.endDate||'-'}</span>
+            <span style="color:var(--text);font-weight:700;">${a.points} ${unit}/회</span>
+            <span style="color:var(--text-muted);font-size:0.85em;">🔒</span>
+          </div>
+        </div>`;
+    }
+    return `
+      <div class="activity-card">
+        <div class="row">
+          <span style="color:var(--gold-foil);font-weight:700;min-width:24px;text-align:center;">${idx+1}.</span>
+          <input class="input" placeholder="활동 이름 (예: 책 읽기)" value="${escapeAttr(a.name)}" onchange="updActivity('${a.id}','name',this.value)" style="flex:2;min-width:180px;">
+          <label>시작 <input class="input" type="date" value="${a.startDate}" onchange="updActivity('${a.id}','startDate',this.value)"></label>
+          <label>종료 <input class="input" type="date" value="${a.endDate}" onchange="updActivity('${a.id}','endDate',this.value)"></label>
+          <label>${unit}/회 <input class="input" type="number" value="${a.points}" style="width:90px;" onchange="updActivity('${a.id}','points',this.value)"></label>
+          <button class="btn btn-sm btn-danger" onclick="delActivity('${a.id}')">삭제</button>
+        </div>
+      </div>`;
+  }).join('');
+
+  const personalCount = book.activities.filter(a => !a.isCommon).length;
+  const commonCount = book.activities.filter(a => a.isCommon).length;
+  const hint = commonCount > 0
+    ? `<p style="color:var(--text-secondary);font-size:0.85em;margin-top:6px;">선생님이 정한 공통 활동 ${commonCount}개 + 내가 정한 활동 ${personalCount}개</p>`
+    : '';
+  document.getElementById('activityList').innerHTML = (html || '<p style="color:var(--text-muted);padding:6px 0;">등록된 활동이 없습니다. 아래에서 추가해 주세요.</p>') + hint;
 }
 function renderBankbookTable(book, unit) {
   const sorted = [...book.records].sort((a,b)=>a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
@@ -2132,9 +2392,11 @@ function renderBankbookTable(book, unit) {
   if (sorted.length === 0) return '<p style="color:var(--text-muted);text-align:center;padding:24px;">— 거래 내역 없음 —</p>';
   const rows = sorted.map((r, i) => {
     running += Number(r.points||0);
+    const checked = selection.save.has(r.id) ? 'checked' : '';
     return `
       <tr class="${r.confirmed?'confirmed':''}">
-        <td class="num" style="width:2.4em;">${String(i+1).padStart(2,'0')}</td>
+        <td style="width:2em;"><input type="checkbox" ${r.confirmed?'disabled':''} ${checked} onchange="toggleSavingsSelect('${r.id}', this.checked)"></td>
+        <td class="num" style="width:2.2em;">${String(i+1).padStart(2,'0')}</td>
         <td class="date-col">${r.date}</td>
         <td class="col-desc">${escapeHTML(r.activityName)}</td>
         <td class="num" style="color:var(--positive);">${fmtMoney(r.points)} ${unit}</td>
@@ -2143,20 +2405,24 @@ function renderBankbookTable(book, unit) {
           ? stampFor(r.id)
           : '<span style="color:var(--text-muted);font-size:0.8em;">확인대기</span>'}
         </td>
-        <td style="width:3em;"><button class="btn btn-xs btn-ghost" onclick="deleteRecord('${r.id}')" ${r.confirmed?'disabled style="opacity:.4;cursor:not-allowed"':''}>삭제</button></td>
       </tr>`;
   }).join('');
   return `
+    <div class="bulk-bar" id="saveBulkBar">
+      <span class="selected-count">선택된 항목 없음</span>
+      <button class="btn btn-sm btn-danger" onclick="bulkDeleteSavings()" disabled>선택 항목 삭제</button>
+    </div>
     <table>
       <thead><tr>
-        <th>No.</th><th>일자</th><th>내용</th><th>입금 ${unit}</th><th>잔액 ${unit}</th><th>인장</th><th></th>
+        <th></th><th>No.</th><th>일자</th><th>내용</th><th>적립 ${unit}</th><th>잔액 ${unit}</th><th>확인</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>`;
 }
 async function addActivity() {
   const book = ensureStudentBucket(view.studentName).savings;
-  if (book.activities.length >= 5) { toast('활동은 최대 5개까지요'); return; }
+  const personalCount = book.activities.filter(a => !a.isCommon).length;
+  if (personalCount >= 5) { toast('내가 정하는 활동은 최대 5개까지요'); return; }
   const a = newActivity();
   book.activities.push(a);
   render();
@@ -2170,16 +2436,18 @@ async function addActivity() {
 function updActivity(id, field, val) {
   const book = ensureStudentBucket(view.studentName).savings;
   const a = book.activities.find(x=>x.id===id);
-  if (!a) return;
+  if (!a || a.isCommon) return;
   a[field] = field==='points' ? Number(val) : val;
   if (isAppsScript) {
     safeCall(api.saveSavingsActivity(view.studentName, a)).catch(()=>{});
   }
 }
 async function delActivity(id) {
-  if (!confirm('이 활동을 삭제할까요?')) return;
   const book = ensureStudentBucket(view.studentName).savings;
-  book.activities = book.activities.filter(a=>a.id!==id);
+  const a = book.activities.find(x=>x.id===id);
+  if (!a || a.isCommon) { toast('공통 활동은 선생님만 변경할 수 있어요'); return; }
+  if (!confirm('이 활동을 삭제할까요?')) return;
+  book.activities = book.activities.filter(x=>x.id!==id);
   render();
   if (isAppsScript) {
     try { await api.deleteSavingsActivity(view.studentName, id); } catch(e) {}
@@ -2250,7 +2518,7 @@ function renderSavingsStats(root) {
       <button class="btn btn-ghost" onclick="view.current='bankbook';render()">‹ 통장으로</button>
       <button class="btn btn-ghost" onclick="logout()">로그아웃</button>
     `)}
-    <h1>${escapeHTML(view.studentName)} · 적립 결산</h1>
+    <h1>적립 결산</h1>
     <div class="stat-grid">
       <div class="stat-tile"><div class="num">${fmtMoney(total)}</div><div class="label">전체 누적 ${unit}</div></div>
       <div class="stat-tile"><div class="num">${fmtMoney(confirmedTotal)}</div><div class="label">확인 ${unit}</div></div>
@@ -2293,31 +2561,78 @@ function renderAllowanceStats(root) {
   const totalExpense = expense.reduce((s,e)=>s+Number(e.amount||0),0);
   const balance = totalIncome - totalExpense;
 
-  // 수입: 고정 vs 특별
   const fixed   = income.filter(e=>e.incomeType==='fixed')  .reduce((s,e)=>s+Number(e.amount||0),0);
   const special = income.filter(e=>e.incomeType==='special').reduce((s,e)=>s+Number(e.amount||0),0);
-  const incomePie = pieChart([
-    { label:'정기 수입', value:fixed,   color:'#1f5a36' },
-    { label:'특별 수입', value:special, color:'#b08a2e' },
-  ]);
 
-  // 지출: 항목(내용)별 합계
-  const byDesc = {};
+  // 수입과 지출 비교 — 가로형 막대그래프 (글씨가 막대 위에 안 겹치게 양옆 분리)
+  const maxVal = Math.max(totalIncome, totalExpense, 1);
+  const incomePct = (totalIncome / maxVal) * 100;
+  const expensePct = (totalExpense / maxVal) * 100;
+  const compareHTML = `
+    <div style="padding:8px 0;">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+        <div style="width:3em;font-weight:700;color:#1f5a36;">수입</div>
+        <div style="flex:1;background:#F0F2F4;height:2em;border-radius:6px;overflow:hidden;">
+          <div style="background:#5BDDC0;height:100%;width:${incomePct}%;border-radius:6px 0 0 6px;"></div>
+        </div>
+        <div class="num pos" style="min-width:6em;text-align:right;font-weight:800;">＋${fmtMoney(totalIncome)}원</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="width:3em;font-weight:700;color:#8b1a1a;">지출</div>
+        <div style="flex:1;background:#F0F2F4;height:2em;border-radius:6px;overflow:hidden;">
+          <div style="background:#F4859A;height:100%;width:${expensePct}%;border-radius:6px 0 0 6px;"></div>
+        </div>
+        <div class="num neg" style="min-width:6em;text-align:right;font-weight:800;">－${fmtMoney(totalExpense)}원</div>
+      </div>
+    </div>`;
+
+  // 지출 — 카테고리별 합계
+  const byCat = {};
   expense.forEach(e => {
-    const k = e.description || '(내용없음)';
-    byDesc[k] = (byDesc[k]||0) + Number(e.amount||0);
+    const k = (e.category || e.description || '기타').trim();
+    byCat[k] = (byCat[k]||0) + Number(e.amount||0);
   });
-  const expenseData = Object.entries(byDesc)
+
+  // 계획에 적힌 분류 키워드를 자동으로 뽑아냄 — 카테고리 이름이 계획 본문에 등장하면 '계획에 있음'
+  const planText = al._plan || '';
+  const plannedCats = new Set(EXPENSE_CATEGORIES.filter(c => planText.includes(c)));
+  const plannedTotal   = expense.filter(e => plannedCats.has(e.category)).reduce((s,e)=>s+Number(e.amount||0),0);
+  const unplannedTotal = expense.filter(e => !plannedCats.has(e.category)).reduce((s,e)=>s+Number(e.amount||0),0);
+
+  // 파이는 카테고리마다 다른 색으로 — 분류 구분이 핵심
+  // 계획/계획밖 여부는 라벨 옆에 표시
+  const expenseData = Object.entries(byCat)
     .sort((a,b)=>b[1]-a[1])
-    .map(([label,value], i) => ({ label, value, color: PIE_COLORS[i % PIE_COLORS.length] }));
+    .map(([label,value], i) => ({
+      label: label + (plannedCats.has(label) ? ' ✓계획' : ' ⚠계획밖'),
+      value,
+      color: PIE_COLORS[i % PIE_COLORS.length],
+    }));
   const expensePie = pieChart(expenseData);
+
+  // 소비 생활 분석
+  const lowNecExpenses = expense.filter(e => e.necessity > 0 && e.necessity <= 2);
+  const wasteAmount = lowNecExpenses.reduce((s,e)=>s+Number(e.amount||0),0);
+  const ratedCount = expense.filter(e=>e.necessity>0).length;
+  const avgNec = ratedCount > 0
+    ? (expense.filter(e=>e.necessity>0).reduce((s,e)=>s+e.necessity,0) / ratedCount).toFixed(1)
+    : '-';
+
+  let advice = '';
+  if (ratedCount === 0) {
+    advice = '아직 지출에 별점을 매기지 않았어요. 다음 지출부터 "꼭 필요했는지" 별점으로 평가해 보세요.';
+  } else if (lowNecExpenses.length === 0) {
+    advice = `잘했어요! 별점 ${avgNec}점으로 꽤 알찬 소비를 했어요. 이 습관을 계속 이어가세요. ✨`;
+  } else {
+    advice = `별점 2점 이하 지출이 ${lowNecExpenses.length}건, 합계 ${fmtMoney(wasteAmount)}원이에요. 다음에는 사기 전에 "정말 필요한가?" 한 번 더 생각해 보면 좋겠어요.`;
+  }
 
   root.innerHTML = `
     ${topBar(`
       <button class="btn btn-ghost" onclick="view.current='bankbook';render()">‹ 통장으로</button>
       <button class="btn btn-ghost" onclick="logout()">로그아웃</button>
     `)}
-    <h1>${escapeHTML(view.studentName)} · 용돈 결산</h1>
+    <h1>용돈 결산</h1>
     <p style="text-align:center;color:var(--text-muted);letter-spacing:0.08em;">
       ${al.period.start && al.period.end
         ? `기간 <b style="color:var(--ink-navy);">${al.period.start} ~ ${al.period.end}</b>`
@@ -2325,20 +2640,93 @@ function renderAllowanceStats(root) {
     </p>
 
     <div class="stat-grid" style="grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.4fr) minmax(0, 1.4fr) minmax(0, 0.7fr);">
-      <div class="stat-tile"><div class="num pos">＋${fmtMoney(totalIncome)}</div><div class="label">총 수입</div></div>
-      <div class="stat-tile"><div class="num neg">－${fmtMoney(totalExpense)}</div><div class="label">총 지출</div></div>
-      <div class="stat-tile"><div class="num" style="color:${balance>=0?'var(--ink-navy)':'var(--negative)'};">${fmtMoney(balance)}</div><div class="label">잔액</div></div>
-      <div class="stat-tile"><div class="num">${inPeriod.length}</div><div class="label">사용 건수</div></div>
+      <div class="stat-tile tile-income"><div class="num pos">＋${fmtMoney(totalIncome)}</div><div class="label">총 수입</div></div>
+      <div class="stat-tile tile-expense"><div class="num neg">－${fmtMoney(totalExpense)}</div><div class="label">총 지출</div></div>
+      <div class="stat-tile tile-balance"><div class="num" style="color:${balance>=0?'var(--ink-navy)':'var(--negative)'};">${fmtMoney(balance)}</div><div class="label">잔액</div></div>
+      <div class="stat-tile tile-count"><div class="num">${inPeriod.length}</div><div class="label">사용 건수</div></div>
     </div>
 
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:18px;margin-top:10px;">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px;margin-top:10px;">
       <div class="activity-card">
-        <h2 style="margin-top:0;">수입 구성 (정기·특별)</h2>
-        ${incomePie}
+        <h2 style="margin-top:0;">이번 기간 수입</h2>
+        <div class="row" style="gap:24px;margin-top:8px;">
+          <div><div style="font-size:0.82em;color:var(--text-secondary);">정기 수입</div><div class="num pos" style="font-size:1.4em;">${fmtMoney(fixed)}원</div></div>
+          <div><div style="font-size:0.82em;color:var(--text-secondary);">특별 수입</div><div class="num pos" style="font-size:1.4em;">${fmtMoney(special)}원</div></div>
+        </div>
       </div>
       <div class="activity-card">
-        <h2 style="margin-top:0;">지출 구성 (내용별)</h2>
-        ${expensePie}
+        <h2 style="margin-top:0;">수입과 지출 비교</h2>
+        ${compareHTML}
+      </div>
+    </div>
+
+    <h2 style="margin-top:18px;">지출 항목별 구성</h2>
+    <div class="activity-card">
+      ${expensePie}
+    </div>
+
+    <h2 style="margin-top:18px;">나의 소비 생활 분석</h2>
+    <div class="activity-card">
+      <!-- 1단계: 처음 세운 지출 계획 -->
+      ${al._plan
+        ? `<div style="padding:14px 16px;background:var(--primary-soft);border-radius:var(--radius-sm);">
+             <b style="color:var(--primary);">① 내가 처음 세운 지출 계획</b>
+             <p style="margin-top:6px;white-space:pre-wrap;color:var(--text);">${escapeHTML(al._plan)}</p>
+           </div>`
+        : `<div style="padding:14px 16px;background:var(--bg-soft);border-radius:var(--radius-sm);color:var(--text-muted);">
+             <b>① 지출 계획</b><br>아직 지출 계획을 적지 않았어요. <b>기간 · 지출 계획 변경</b>에서 적어보세요.
+           </div>`}
+
+      <!-- 2단계: 계획대로 쓴 것 vs 계획 밖에 쓴 것 -->
+      <div style="margin-top:14px;padding:14px 16px;background:var(--bg-soft);border-radius:var(--radius-sm);">
+        <b style="color:var(--text);">② 실제로 사용한 내역 — 계획대로 쓴 것 vs 계획 밖에 쓴 것</b>
+        ${Object.keys(byCat).length === 0
+          ? `<p style="margin-top:6px;color:var(--text-muted);">아직 지출 기록이 없어요.</p>`
+          : `
+            <div class="row" style="gap:16px;flex-wrap:wrap;margin-top:10px;">
+              <div style="background:#E4F8F3;border:1px solid #5BDDC0;padding:10px 14px;border-radius:10px;flex:1;min-width:180px;">
+                <div style="font-size:0.85em;color:#1f5a36;font-weight:700;">✓ 계획대로 쓴 돈</div>
+                <div class="num" style="font-size:1.35em;font-weight:800;color:#1f5a36;">-${fmtMoney(plannedTotal)}원</div>
+              </div>
+              <div style="background:#FFE9D7;border:1px solid #F4A35C;padding:10px 14px;border-radius:10px;flex:1;min-width:180px;">
+                <div style="font-size:0.85em;color:#a65500;font-weight:700;">! 계획 밖에 쓴 돈</div>
+                <div class="num" style="font-size:1.35em;font-weight:800;color:#a65500;">-${fmtMoney(unplannedTotal)}원</div>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-top:14px;">
+              ${Object.entries(byCat).sort((a,b)=>b[1]-a[1]).map(([cat,val]) => {
+                const planned = plannedCats.has(cat);
+                return `
+                 <div style="background:${planned?'#E4F8F3':'#FFE9D7'};padding:10px 12px;border-radius:8px;border:1px solid ${planned?'#5BDDC0':'#F4A35C'};">
+                   <div style="font-size:0.82em;color:${planned?'#1f5a36':'#a65500'};font-weight:600;">
+                     ${escapeHTML(cat)} <span style="font-size:0.8em;opacity:0.85;">${planned?'· 계획':'· 계획 밖'}</span>
+                   </div>
+                   <div class="num" style="font-size:1.1em;font-weight:700;color:${planned?'#1f5a36':'#a65500'};">-${fmtMoney(val)}원</div>
+                 </div>`;
+              }).join('')}
+            </div>
+            <p style="margin-top:10px;font-size:0.88em;color:var(--text-secondary);">초록은 처음 계획에 있던 분류, 주황은 계획에 없었던 분류예요.</p>`}
+      </div>
+
+      <!-- 3단계: 한 줄 조언 + 지출 평균 별점 나란히 -->
+      <div class="row" style="gap:14px;align-items:stretch;margin-top:14px;flex-wrap:wrap;">
+        <div style="flex:3;min-width:260px;padding:14px 16px;background:#FFF8E1;border:1px solid #F2B860;border-radius:var(--radius-sm);color:#7a5b0d;line-height:1.6;word-break:keep-all;overflow-wrap:break-word;">
+          <b>③ 한 줄 조언</b><br>${advice}
+        </div>
+        <div style="flex:1;min-width:140px;padding:14px 16px;background:white;border:1px solid var(--border);border-radius:var(--radius-sm);text-align:center;display:flex;flex-direction:column;justify-content:center;">
+          <div style="font-size:0.82em;color:var(--text-secondary);">지출 평균 별점</div>
+          <div class="num" style="font-size:1.8em;font-weight:800;color:var(--text);">${avgNec}</div>
+          <div style="font-size:0.78em;color:var(--text-muted);">5점 만점</div>
+        </div>
+      </div>
+
+      <!-- 4단계: 내 생각과 다음 계획 적용 -->
+      <div style="margin-top:14px;padding:14px 16px;background:#F3F5F8;border:1px dashed #9AB0CC;border-radius:var(--radius-sm);">
+        <b style="color:var(--primary-deep);">④ 한 줄 조언에 대한 내 생각 · 다음 계획에 적용할 것</b>
+        <textarea class="input" id="reflectionInput" rows="3" placeholder="예) 간식에 너무 많이 썼다. 다음에는 일주일에 한 번만 사기로 하자. 게임 아이템은 다음 계획에서 빼야겠다." style="width:100%;margin-top:8px;resize:vertical;word-break:keep-all;overflow-wrap:break-word;line-height:1.6;">${escapeHTML(al._reflection || '')}</textarea>
+        <div class="row" style="justify-content:flex-end;margin-top:8px;">
+          <button class="btn btn-primary btn-sm" onclick="saveReflection()">저장하기</button>
+        </div>
       </div>
     </div>
   `;
@@ -2387,6 +2775,9 @@ function renderLoading() {
       </div>
     </div>`;
 }
+
+// 선생님 작업은 모두 스프레드시트에서 처리합니다 — 앱에는 학생 화면만 노출.
+// (도장 찍기·설정 변경·통계 보기·공통 활동 모두 시트에서 직접)
 
 (async () => {
   renderLoading();
