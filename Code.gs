@@ -35,7 +35,7 @@ const PROP_PW    = 'teacher_password';
 const DEFAULT_PW = '1234';
 const PROP_BANK  = 'bank_name';
 const DEFAULT_BANK = '우리반은행';
-const PROP_SHEET_ID = 'spreadsheet_id';
+const PROP_SHEET_ID = '13yq2MVlRplEApfQThF8ghgj94xi7_bsD4v_USxZ9wcY';
 
 /* ===========================================================================
  * doGet — Apps Script 웹앱 진입점
