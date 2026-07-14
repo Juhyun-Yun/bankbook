@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>우리 반 통장 & 용돈기입장</title>
+<title>🏦 스마트 통장</title>
 <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -474,6 +474,37 @@
     background: rgba(255,255,255,0.18);
   }
 
+  /* 통장 표지 아래 — ⚙ 설정 (선생님용). 학생용 주소로 들어오면 렌더되지 않음 */
+  .login-settings {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.7em;
+    flex-wrap: wrap;
+    margin-top: 0.9em;
+  }
+  .settings-link {
+    font-size: 0.9em;
+    font-weight: 400;
+    color: var(--text-secondary, #5F6B7A);
+    background: transparent;
+    border: 1px solid var(--border, #DCE1E8);
+    padding: 0.4em 0.9em;
+    border-radius: 0.6em;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .settings-link:hover {
+    color: var(--text, #1B2733);
+    background: var(--bg-soft, #F4F6F9);
+  }
+  .login-settings .demo-hint {
+    font-size: 0.8em;
+    color: var(--text-muted, #8A94A2);
+  }
+  .login-settings .demo-hint.ok { color: var(--positive, #159A5B); }
+
   .login-card select { font-size: 1.05em; padding: 10px 14px; min-width: 240px; }
 
   /* Bankbook selection - modern cards */
@@ -847,17 +878,18 @@
 
 <script>
 /* ===========================================================================
- *  데이터 모델 — Apps Script + Google Sheet 가 단일 진실원천
- *  - 시작 시 google.script.run.getRoster() 로 명단 로드
+ *  데이터 모델
+ *  - 연결 시: 선생님의 구글 시트가 단일 진실원천 (api.getRoster 등으로 로드)
+ *  - 체험 시: 이 기기(localStorage)가 저장소 (학생1~30, 다음에 와도 이어서)
  *  - 학생 로그인 시 getStudentData(name) 로 그 학생 데이터 로드
- *  - 모든 변경은 즉시 시트로 저장(API 호출 + 낙관적 업데이트)
+ *  - 모든 변경은 즉시 저장(API 호출 + 낙관적 업데이트)
  * =======================================================================*/
 
 const state = {
   teacherPassword: '1234',
-  bankName: '우리반은행',
+  bankName: '스마트 통장',
   settings: {            // 전역 설정 (반 전체에 적용)
-    bankName: '우리반은행',
+    bankName: '스마트 통장',
     savingsEnabled: true,
     allowanceEnabled: true,
   },
@@ -866,79 +898,294 @@ const state = {
   meta: null,            // {spreadsheetName, spreadsheetUrl, sheetsInitialized}
   loading: true,
   apiReady: false,
+  mode: 'demo',          // 'link'(학생용 주소) | 'connected'(이 기기에 저장) | 'demo'(체험)
+  execUrl: '',           // 연결된 시트의 웹 앱 주소
 };
 
 function uid() { return 'id_' + Math.random().toString(36).slice(2,10); }
 function saveState() { /* no-op: 시트가 진실원천. UI 호환을 위해 유지 */ }
 
 /* ===========================================================================
- *  API — google.script.run 래퍼 (Apps Script 환경) / 또는 미연결 안내
+ *  연결 상태 — 아무것도 입력하지 않아도 세 가지를 자동 판별
+ *   1) 학생용 입장 주소(#c=…)로 들어옴 → 그 시트에 연결 · 설정 숨김
+ *   2) 이 기기에 저장된 주소가 있음       → 그 시트에 연결 · 설정 보임
+ *   3) 둘 다 없음                        → 체험 모드(학생1~30, 이 기기에 저장)
  * =======================================================================*/
-function inAppsScript() {
-  return (typeof google !== 'undefined') && !!google.script && !!google.script.run;
-}
-let isAppsScript = inAppsScript();
+const APP_KEY     = 'smartbank';
+const EXEC_KEY    = APP_KEY + ':exec';
+const DEMO_PREFIX = APP_KEY + ':demo:';
 
-// google.script 가 늦게 주입되는 경우를 대비 — 페이지 로드 직후 짧게 polling
-async function waitForAppsScript(timeoutMs = 1500) {
-  if (inAppsScript()) return true;
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    await new Promise(r => setTimeout(r, 50));
-    if (inAppsScript()) { isAppsScript = true; return true; }
-  }
-  return false;
+function readLinkedUrl() {
+  const h = String(location.hash || '');
+  const m = h.match(/[#&]c=([^&]*)/);
+  if (m && m[1]) { try { return decodeURIComponent(m[1]); } catch(_) { return m[1]; } }
+  return '';
+}
+function detectConnection() {
+  const linked = readLinkedUrl();
+  if (linked) { state.execUrl = linked; state.mode = 'link'; return; }
+  let saved = '';
+  try { saved = localStorage.getItem(EXEC_KEY) || ''; } catch(_) {}
+  if (saved) { state.execUrl = saved; state.mode = 'connected'; return; }
+  state.execUrl = '';
+  state.mode = 'demo';
+}
+function isConnected() { return state.mode === 'link' || state.mode === 'connected'; }
+function showGear()    { return state.mode !== 'link'; }        // 학생용 주소로 들어오면 설정을 아예 감춤
+function studentEntryUrl(exec) {
+  return location.origin + location.pathname + '#c=' + encodeURIComponent(exec || state.execUrl);
 }
 
-function callGS(fn, ...args) {
-  if (!inAppsScript()) return Promise.reject(new Error('not-in-apps-script'));
+/* ===========================================================================
+ *  통신 — 연결된 시트로 요청(다른 주소의 화면에서도 읽히도록 스크립트 방식)
+ * =======================================================================*/
+let _reqSeq = 0;
+function remoteFetch(url, timeoutMs = 25000) {
   return new Promise((resolve, reject) => {
-    google.script.run
-      .withSuccessHandler(resolve)
-      .withFailureHandler(err => reject(new Error(err && err.message ? err.message : String(err))))
-      [fn](...args);
+    const cb = '__sb' + (_reqSeq++);
+    const s = document.createElement('script');
+    let done = false;
+    const timer = setTimeout(() => finish(() => reject(new Error('시간이 초과되었어요'))), timeoutMs);
+    function cleanup() {
+      try { delete window[cb]; } catch(_) { window[cb] = undefined; }
+      if (s.parentNode) s.parentNode.removeChild(s);
+      clearTimeout(timer);
+    }
+    function finish(fn) { if (done) return; done = true; cleanup(); fn(); }
+    window[cb] = (payload) => finish(() => resolve(payload));
+    s.onerror = () => finish(() => reject(new Error('연결에 실패했어요')));
+    s.src = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'callback=' + cb;
+    document.body.appendChild(s);
   });
 }
-
-// 일시적 실패에 대비해 자동 재시도 (지수적 대기, 최대 3회)
-async function callGSRetry(fn, ...args) {
+async function callRemote(action, args) {
+  const base = state.execUrl;
+  if (!base) throw new Error('연결된 주소가 없어요');
+  const url = base
+    + (base.indexOf('?') >= 0 ? '&' : '?')
+    + 'action=' + encodeURIComponent(action)
+    + '&args='  + encodeURIComponent(JSON.stringify(args || []));
+  const res = await remoteFetch(url);
+  if (res && res.ok) return res.data;
+  throw new Error(res && res.error ? res.error : '요청을 처리하지 못했어요');
+}
+async function callRemoteRetry(action, args) {
   let lastErr;
   for (let i = 0; i < 3; i++) {
-    try { return await callGS(fn, ...args); }
-    catch (e) { lastErr = e; await new Promise(r => setTimeout(r, 300 * (i+1))); }
+    try { return await callRemote(action, args); }
+    catch (e) { lastErr = e; await new Promise(r => setTimeout(r, 400 * (i+1))); }
   }
   throw lastErr;
 }
 
+// 요청 하나를 상황(연결/체험)에 맞는 저장소로 보낸다.
+function apiSend(action, args) {
+  if (state.mode === 'demo') return Promise.resolve(demoBackend(action, args || []));
+  return callRemoteRetry(action, args || []);
+}
+
+/* ===========================================================================
+ *  체험 모드 저장소 — 이 기기(브라우저)에만 저장, 다음에 와도 이어서
+ * =======================================================================*/
+function demoRosterNames() {
+  const a = [];
+  for (let i = 1; i <= 30; i++) a.push('학생' + i);
+  return a;
+}
+function demoNewId(p) { return p + '_' + Math.random().toString(36).slice(2, 10); }
+function demoDefaultStudent() {
+  return { savings: { activities: [], records: [] },
+           allowance: { period: { start: '', end: '' }, entries: [] } };
+}
+function demoLoadStudent(name) {
+  try {
+    const raw = localStorage.getItem(DEMO_PREFIX + 'student:' + name);
+    if (raw) return JSON.parse(raw);
+  } catch(_) {}
+  return demoDefaultStudent();
+}
+function demoSaveStudent(name, data) {
+  try { localStorage.setItem(DEMO_PREFIX + 'student:' + name, JSON.stringify(data)); } catch(_) {}
+}
+function demoGetSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem(DEMO_PREFIX + 'settings') || 'null');
+    if (s) return s;
+  } catch(_) {}
+  return { bankName: '스마트 통장', savingsEnabled: true, allowanceEnabled: true };
+}
+function demoSetSettings(s) {
+  try { localStorage.setItem(DEMO_PREFIX + 'settings', JSON.stringify(s)); } catch(_) {}
+}
+function demoBackend(action, args) {
+  switch (action) {
+    case 'getMeta':
+      return { ok: true, _demo: true, spreadsheetName: '체험 모드',
+               spreadsheetUrl: '', spreadsheetId: '', boundMode: true, sheetsInitialized: true };
+    case 'getSettings':
+      return demoGetSettings();
+    case 'setSetting': {
+      const s = demoGetSettings();
+      if (args[0] === '은행이름')       s.bankName = String(args[1] || '스마트 통장');
+      if (args[0] === '적립통장사용')   s.savingsEnabled   = args[1] !== false;
+      if (args[0] === '용돈기입장사용') s.allowanceEnabled = args[1] !== false;
+      demoSetSettings(s);
+      return { ok: true };
+    }
+    case 'getBankName':
+      return demoGetSettings().bankName || '스마트 통장';
+    case 'setBankName': {
+      const s = demoGetSettings(); s.bankName = String(args[0] || '스마트 통장'); demoSetSettings(s);
+      return { ok: true };
+    }
+    case 'getTeacherPassword': return '1234';
+    case 'setTeacherPassword': return { ok: true };
+    case 'getRoster':
+      return demoRosterNames().map(n => {
+        const d = demoLoadStudent(n);
+        const p = (d.allowance && d.allowance.period) || {};
+        return { name: n, allowanceStart: p.start || '', allowanceEnd: p.end || '' };
+      });
+    case 'getStudentData':
+      return demoLoadStudent(String(args[0] || ''));
+    case 'saveSavingsActivity': {
+      const n = args[0], a = args[1] || {};
+      const d = demoLoadStudent(n), id = a.id || demoNewId('a');
+      const rec = { id, name: a.name || '', startDate: a.startDate || '', endDate: a.endDate || '',
+                    points: Number(a.points || 0), isCommon: false };
+      const i = d.savings.activities.findIndex(x => x.id === id);
+      if (i >= 0) d.savings.activities[i] = rec; else d.savings.activities.push(rec);
+      demoSaveStudent(n, d);
+      return { ok: true, id };
+    }
+    case 'deleteSavingsActivity': {
+      const n = args[0], id = args[1], d = demoLoadStudent(n);
+      d.savings.activities = d.savings.activities.filter(x => x.id !== id);
+      demoSaveStudent(n, d);
+      return { ok: true };
+    }
+    case 'saveSavingsRecord': {
+      const n = args[0], r = args[1] || {};
+      const d = demoLoadStudent(n), id = r.id || demoNewId('r');
+      const rec = { id, date: r.date || '', activityName: r.activityName || '',
+                    points: Number(r.points || 0), confirmed: !!r.confirmed };
+      const i = d.savings.records.findIndex(x => x.id === id);
+      if (i >= 0) d.savings.records[i] = rec; else d.savings.records.push(rec);
+      demoSaveStudent(n, d);
+      return { ok: true, id };
+    }
+    case 'deleteSavingsRecord': {
+      const n = args[0], id = args[1], d = demoLoadStudent(n);
+      d.savings.records = d.savings.records.filter(x => x.id !== id);
+      demoSaveStudent(n, d);
+      return { ok: true };
+    }
+    case 'setAllowancePeriod': {
+      const n = args[0], d = demoLoadStudent(n);
+      d.allowance.period = { start: args[1] || '', end: args[2] || '' };
+      demoSaveStudent(n, d);
+      return { ok: true };
+    }
+    case 'saveAllowanceEntry': {
+      const n = args[0], e = args[1] || {};
+      const d = demoLoadStudent(n), id = e.id || demoNewId('e');
+      const rec = { id, date: e.date || '', description: e.description || '',
+                    amount: Number(e.amount || 0), kind: e.kind || 'income',
+                    incomeType: e.incomeType || 'fixed', confirmed: !!e.confirmed,
+                    category: e.category || '', necessity: Number(e.necessity || 0) };
+      const i = d.allowance.entries.findIndex(x => x.id === id);
+      if (i >= 0) d.allowance.entries[i] = rec; else d.allowance.entries.push(rec);
+      demoSaveStudent(n, d);
+      return { ok: true, id };
+    }
+    case 'deleteAllowanceEntry': {
+      const n = args[0], id = args[1], d = demoLoadStudent(n);
+      d.allowance.entries = d.allowance.entries.filter(x => x.id !== id);
+      demoSaveStudent(n, d);
+      return { ok: true };
+    }
+    case 'confirmRecord': {
+      const n = args[0], k = args[1], id = args[2], v = !!args[3], d = demoLoadStudent(n);
+      const list = k === 'savings' ? d.savings.records : d.allowance.entries;
+      const r = list.find(x => x.id === id);
+      if (r) r.confirmed = v;
+      demoSaveStudent(n, d);
+      return { ok: true };
+    }
+    case 'getAllRecords': {
+      const out = [];
+      demoRosterNames().forEach(n => {
+        const d = demoLoadStudent(n);
+        d.savings.records.forEach(r => out.push({ name: n, kind: 'savings', id: r.id,
+          date: r.date, description: r.activityName, amount: r.points, confirmed: r.confirmed }));
+        d.allowance.entries.forEach(e => out.push({ name: n, kind: 'allowance', id: e.id,
+          date: e.date, description: e.description, amount: e.amount, entryKind: e.kind,
+          incomeType: e.incomeType, confirmed: e.confirmed }));
+      });
+      return out;
+    }
+    case 'getExpensePlan':
+      try { return localStorage.getItem(DEMO_PREFIX + 'plan:' + args[0]) || ''; } catch(_) { return ''; }
+    case 'setExpensePlan':
+      try {
+        if (args[1]) localStorage.setItem(DEMO_PREFIX + 'plan:' + args[0], String(args[1]));
+        else localStorage.removeItem(DEMO_PREFIX + 'plan:' + args[0]);
+      } catch(_) {}
+      return { ok: true };
+    case 'getReflection':
+      try { return localStorage.getItem(DEMO_PREFIX + 'reflect:' + args[0]) || ''; } catch(_) { return ''; }
+    case 'setReflection':
+      try {
+        if (args[1]) localStorage.setItem(DEMO_PREFIX + 'reflect:' + args[0], String(args[1]));
+        else localStorage.removeItem(DEMO_PREFIX + 'reflect:' + args[0]);
+      } catch(_) {}
+      return { ok: true };
+    case 'getSpreadsheetId':   return '';
+    case 'setSpreadsheetId':   return { ok: false, error: '체험 모드예요' };
+    case 'getDiagnostic':
+      return { connected: false, error: '체험 모드예요 — 선생님이 구글 시트를 연결하면 이곳에서 상태를 볼 수 있어요.' };
+    case 'initSheets':
+    case 'createGuide':        return { ok: true };
+    default:                   return { ok: true };
+  }
+}
+
+/* ===========================================================================
+ *  API — 연결이면 시트로, 체험이면 이 기기에 저장 (호출부는 동일)
+ * =======================================================================*/
 const api = {
-  getMeta:               ()           => callGS('getMeta'),
-  initSheets:            ()           => callGS('initSheets'),
-  getRoster:             ()           => callGS('getRoster'),
-  getStudentData:        (n)          => callGS('getStudentData', n),
-  saveSavingsActivity:   (n, a)       => callGS('saveSavingsActivity', n, a),
-  deleteSavingsActivity: (n, id)      => callGS('deleteSavingsActivity', n, id),
-  saveSavingsRecord:     (n, r)       => callGS('saveSavingsRecord', n, r),
-  deleteSavingsRecord:   (n, id)      => callGS('deleteSavingsRecord', n, id),
-  setAllowancePeriod:    (n, s, e)    => callGS('setAllowancePeriod', n, s, e),
-  saveAllowanceEntry:    (n, e)       => callGS('saveAllowanceEntry', n, e),
-  deleteAllowanceEntry:  (n, id)      => callGS('deleteAllowanceEntry', n, id),
-  confirmRecord:         (n,k,id,v)   => callGS('confirmRecord', n, k, id, v),
-  getAllRecords:         ()           => callGS('getAllRecords'),
-  getTeacherPassword:    ()           => callGS('getTeacherPassword'),
-  setTeacherPassword:    (pw)         => callGS('setTeacherPassword', pw),
-  getBankName:           ()           => callGS('getBankName'),
-  setBankName:           (n)          => callGS('setBankName', n),
-  getSpreadsheetId:      ()           => callGS('getSpreadsheetId'),
-  setSpreadsheetId:      (id)         => callGS('setSpreadsheetId', id),
-  getDiagnostic:         ()           => callGS('getDiagnostic'),
-  getSettings:           ()           => callGS('getSettings'),
-  setSetting:            (k,v)        => callGS('setSetting', k, v),
-  getExpensePlan:        (n)          => callGS('getExpensePlan', n),
-  setExpensePlan:        (n,p)        => callGS('setExpensePlan', n, p),
-  getReflection:         (n)          => callGS('getReflection', n),
-  setReflection:         (n,t)        => callGS('setReflection', n, t),
-  createGuide:           ()           => callGS('createGuide'),
+  getMeta:               ()           => apiSend('getMeta'),
+  initSheets:            ()           => apiSend('initSheets'),
+  getRoster:             ()           => apiSend('getRoster'),
+  getStudentData:        (n)          => apiSend('getStudentData', [n]),
+  saveSavingsActivity:   (n, a)       => apiSend('saveSavingsActivity', [n, a]),
+  deleteSavingsActivity: (n, id)      => apiSend('deleteSavingsActivity', [n, id]),
+  saveSavingsRecord:     (n, r)       => apiSend('saveSavingsRecord', [n, r]),
+  deleteSavingsRecord:   (n, id)      => apiSend('deleteSavingsRecord', [n, id]),
+  setAllowancePeriod:    (n, s, e)    => apiSend('setAllowancePeriod', [n, s, e]),
+  saveAllowanceEntry:    (n, e)       => apiSend('saveAllowanceEntry', [n, e]),
+  deleteAllowanceEntry:  (n, id)      => apiSend('deleteAllowanceEntry', [n, id]),
+  confirmRecord:         (n,k,id,v)   => apiSend('confirmRecord', [n, k, id, v]),
+  getAllRecords:         ()           => apiSend('getAllRecords'),
+  getTeacherPassword:    ()           => apiSend('getTeacherPassword'),
+  setTeacherPassword:    (pw)         => apiSend('setTeacherPassword', [pw]),
+  getBankName:           ()           => apiSend('getBankName'),
+  setBankName:           (n)          => apiSend('setBankName', [n]),
+  getSpreadsheetId:      ()           => apiSend('getSpreadsheetId'),
+  setSpreadsheetId:      (id)         => apiSend('setSpreadsheetId', [id]),
+  getDiagnostic:         ()           => apiSend('getDiagnostic'),
+  getSettings:           ()           => apiSend('getSettings'),
+  setSetting:            (k,v)        => apiSend('setSetting', [k, v]),
+  getExpensePlan:        (n)          => apiSend('getExpensePlan', [n]),
+  setExpensePlan:        (n,p)        => apiSend('setExpensePlan', [n, p]),
+  getReflection:         (n)          => apiSend('getReflection', [n]),
+  setReflection:         (n,t)        => apiSend('setReflection', [n, t]),
+  createGuide:           ()           => apiSend('createGuide'),
 };
+
+// 옛 코드 호환 — 지금은 연결/체험 모두 저장되므로 항상 활성
+function inAppsScript() { return true; }
+let isAppsScript = true;
 
 /* API 호출 시 오류는 토스트로 보여주고 콘솔에 기록 */
 function safeCall(fn) {
@@ -1174,11 +1421,8 @@ function loadSampleData() {
  *  명단 새로고침 (Apps Script API)
  * =======================================================================*/
 async function refreshRoster({silent=false} = {}) {
-  if (!inAppsScript()) {
-    return { ok:false };
-  }
   try {
-    const r = await callGSRetry('getRoster');
+    const r = await api.getRoster();
     state.roster = r;
     if (!silent) toast(`명단을 다시 불러왔습니다 (${r.length}명)`);
     return { ok:true };
@@ -1340,7 +1584,7 @@ function renderLogin(root) {
         </div>
 
         <div class="content">
-          <div class="bank-display">${escapeHTML(state.bankName||'우리반은행')}</div>
+          <div class="bank-display">🏦 ${escapeHTML(state.bankName||'스마트 통장')}</div>
           <div class="bank-sub">SAVINGS · ALLOWANCE BOOK</div>
 
           <div class="login-form">
@@ -1352,8 +1596,105 @@ function renderLogin(root) {
 
         <div class="bank-corner">BANK</div>
       </div>
+      ${showGear() ? `
+        <div class="login-settings">
+          <button class="settings-link" onclick="openConnectSettings()">⚙ 설정</button>
+          ${state.mode === 'demo'
+            ? `<span class="demo-hint">체험 모드 · 설정에서 시트를 연결하면 저장돼요</span>`
+            : `<span class="demo-hint ok">이 반 시트에 연결됨</span>`}
+        </div>` : ''}
     </div>
   `;
+}
+
+/* ===========================================================================
+ *  시트 연결 설정 (통장 표지의 ⚙ 설정) — 선생님용
+ *   · 웹 앱 주소를 붙여넣어 연결
+ *   · 연결되면 학생용 입장 주소를 만들어 복사
+ *  (학생용 주소로 들어온 화면에서는 설정 버튼 자체가 나오지 않음)
+ * =======================================================================*/
+function openConnectSettings() {
+  if (!showGear()) return;
+  const connected = isConnected();
+  const statusLine = connected
+    ? `<p style="color:var(--positive);margin:6px 0 14px;">지금 이 반 시트에 연결되어 있어요.</p>`
+    : `<p style="color:var(--warning);margin:6px 0 14px;">아직 연결 전이에요. 지금은 체험 모드(학생1~30)로 이 기기에만 저장됩니다.</p>`;
+  const linkBlock = connected ? `
+    <hr style="margin:18px 0 12px;">
+    <label class="owner-label" style="color:var(--text-secondary);">학생용 입장 주소</label>
+    <div class="row" style="gap:8px;margin-top:6px;">
+      <input class="input" id="studentLinkOut" readonly style="flex:1;min-width:0;font-size:0.82em;" value="${escapeAttr(studentEntryUrl())}">
+      <button class="btn btn-primary" onclick="copyStudentLink()">복사</button>
+    </div>
+    <p style="font-size:0.82em;color:var(--text-muted);margin-top:6px;">이 주소를 학생들에게 나눠주세요. 학생은 이 주소로 들어와 이름을 골라 입장합니다.</p>
+    <div class="right" style="margin-top:14px;">
+      <button class="btn btn-ghost" onclick="disconnectSheet()">이 기기 연결 해제</button>
+    </div>` : '';
+  openModal(`
+    <h2 style="margin-bottom:0;">시트 연결</h2>
+    ${statusLine}
+    <label class="owner-label" style="color:var(--text-secondary);">웹 앱 주소 (…/exec)</label>
+    <input class="input" id="execIn" style="width:100%;margin-top:6px;" placeholder="https://script.google.com/macros/s/…/exec" value="${escapeAttr(state.mode==='connected'?state.execUrl:'')}">
+    <p style="font-size:0.82em;color:var(--text-muted);margin-top:6px;">구글 시트에서 배포한 웹 앱 주소예요. 시트의 '사용 설명' 탭 안내를 참고하세요.</p>
+    <div class="right" style="margin-top:12px;">
+      <button class="btn btn-ghost" onclick="closeModal()">닫기</button>
+      <button class="btn btn-primary" onclick="connectSheet()">연결하기</button>
+    </div>
+    ${linkBlock}
+    <hr style="margin:18px 0 12px;">
+    <button class="settings-link" onclick="askTeacherPassword()">선생님 화면 열기</button>
+  `);
+  setTimeout(()=>document.getElementById('execIn')?.focus(), 50);
+}
+
+async function connectSheet() {
+  const v = (document.getElementById('execIn').value || '').trim();
+  if (!v) { toast('웹 앱 주소를 입력해 주세요'); return; }
+  toast('연결 중…');
+  const prevUrl = state.execUrl, prevMode = state.mode;
+  state.execUrl = v; state.mode = 'connected';
+  try {
+    const roster = await api.getRoster();   // 실제로 열리는지 확인 겸 명단 로드
+    state.roster = Array.isArray(roster) ? roster : [];
+    try { localStorage.setItem(EXEC_KEY, v); } catch(_) {}
+    try { const s = await api.getSettings(); state.settings = s || state.settings; state.bankName = state.settings.bankName || state.bankName; } catch(_) {}
+    try { state.teacherPassword = (await api.getTeacherPassword()) || '1234'; } catch(_) {}
+    state.records = {};  // 체험 데이터 캐시 비우고 시트 기준으로
+    toast('연결됐어요! 이 반 명단을 불러왔어요');
+    closeModal();
+    render();                 // 새로고침 없이 바로 명단 반영 (체험 → 연결)
+    openConnectSettings();     // 학생용 주소 복사 화면을 이어서 보여줌
+  } catch(e) {
+    state.execUrl = prevUrl; state.mode = prevMode;
+    toast('연결 실패: ' + (e.message || '주소를 확인해 주세요'));
+  }
+}
+
+function copyStudentLink() {
+  const el = document.getElementById('studentLinkOut');
+  if (!el) return;
+  const ok = () => toast('학생용 주소를 복사했어요');
+  const fallback = () => { try { el.select(); el.setSelectionRange(0, 99999); document.execCommand('copy'); ok(); } catch(_) { toast('복사하지 못했어요 · 주소를 길게 눌러 복사해 주세요'); } };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(el.value).then(ok, fallback);
+  } else { fallback(); }
+}
+
+function disconnectSheet() {
+  if (!confirm('이 기기의 시트 연결을 해제하고 체험 모드로 돌아갈까요?')) return;
+  try { localStorage.removeItem(EXEC_KEY); } catch(_) {}
+  state.execUrl = ''; state.mode = 'demo';
+  state.records = {};
+  closeModal();
+  toast('연결을 해제했어요 · 체험 모드');
+  (async () => {
+    try {
+      state.roster   = await api.getRoster();
+      state.settings = await api.getSettings();
+      state.bankName = state.settings.bankName || '스마트 통장';
+    } catch(_) {}
+    render();
+  })();
 }
 async function loginSync() {
   toast('명단을 불러오는 중…');
@@ -1588,7 +1929,7 @@ async function toggleSetting(key, value) {
 async function saveSheetId() {
   const v = (document.getElementById('sheetIdInput').value || '').trim();
   if (!v) { toast('스프레드시트 URL 또는 ID 를 입력해 주세요'); return; }
-  if (!inAppsScript()) { toast('Apps Script 웹앱에서만 동작합니다'); return; }
+  if (state.mode === 'demo') { toast('체험 모드예요 · 통장 표지의 설정에서 시트를 연결하면 사용할 수 있어요'); return; }
   toast('연결 중…');
   try {
     const res = await api.setSpreadsheetId(v);
@@ -1604,7 +1945,7 @@ async function saveSheetId() {
 }
 
 async function clearSheetId() {
-  if (!inAppsScript()) return;
+  if (state.mode === 'demo') { toast('체험 모드예요'); return; }
   if (!confirm('저장된 스프레드시트 ID 를 초기화할까요? 바인딩된 스크립트라면 그 시트로 자동 복귀합니다.')) return;
   try {
     await api.setSpreadsheetId('');
@@ -1616,7 +1957,7 @@ async function clearSheetId() {
 }
 
 async function runDiagnostic() {
-  if (!inAppsScript()) { toast('Apps Script 웹앱에서만 동작합니다'); return; }
+  if (state.mode === 'demo') { toast('체험 모드예요 · 시트를 연결하면 상태를 볼 수 있어요'); return; }
   toast('진단 중…');
   try {
     state.diagnostic = await api.getDiagnostic();
@@ -1640,7 +1981,7 @@ function renderDiagnosticBlock() {
 
   const using = d.using || {};
   const expected = d.expectedSheets || [];
-  const rosterInfo = expected.find(s => s.name === '명단') || {};
+  const rosterInfo = expected.find(s => s.name === '학생 명단') || {};
 
   // 명단 헤더 비교
   const headerOk = rosterInfo.headersMatch;
@@ -1691,7 +2032,7 @@ function renderDiagnosticBlock() {
 
       <hr>
 
-      <b>명단 시트 상태</b>
+      <b>학생 명단 시트 상태</b>
       ${rosterInfo.exists
         ? `<div style="margin-top:6px;font-size:0.92em;">
              데이터 행: <b>${d.rosterDataRows||0}명</b>
@@ -1703,17 +2044,17 @@ function renderDiagnosticBlock() {
              <div style="margin-top:6px;font-size:0.85em;color:var(--negative);">
                실제 헤더: <code>${escapeHTML(actualH)}</code><br>
                기대 헤더: <code>${escapeHTML(expectedH)}</code><br>
-               → 명단 시트 첫 줄을 정확히 <code>이름 / 적립통장잠금 / 용돈기입장잠금 / 용돈기간시작 / 용돈기간종료</code> 로 맞춰주세요.
+               → 학생 명단 시트 첫 줄을 정확히 <code>번호 / 이름 / 용돈기간시작 / 용돈기간종료</code> 로 맞춰주세요.
              </div>` : ''}
            <div style="margin-top:10px;font-size:0.88em;color:var(--text-secondary);">처음 5명 미리보기:</div>
            <table style="margin-top:4px;">${sampleHtml}</table>`
-        : `<div style="margin-top:6px;color:var(--negative);">명단 시트가 없습니다. 위의 <b>시트 초기화</b> 버튼을 눌러주세요.</div>`}
+        : `<div style="margin-top:6px;color:var(--negative);">학생 명단 시트가 없습니다. 위의 <b>시트 초기화</b> 버튼을 눌러주세요.</div>`}
 
       ${(d.rosterDataRows||0) === 0 && rosterInfo.exists ? `
         <hr>
         <div style="background:var(--warning-soft);color:var(--warning);padding:10px 14px;border-radius:var(--radius-sm);margin-top:8px;">
           <b>안내</b> · 명단에 학생 데이터가 없습니다.
-          위 링크로 스프레드시트를 열어 <code>명단</code> 탭의 <b>이름</b> 열에 학생 이름을 한 줄씩 추가한 뒤, 아래 <b>다시 확인</b>을 눌러주세요.
+          위 링크로 스프레드시트를 열어 <code>학생 명단</code> 탭의 <b>이름</b> 열에 학생 이름을 한 줄씩 추가한 뒤, 아래 <b>다시 확인</b>을 눌러주세요.
         </div>` : ''}
     </div>`;
 }
@@ -1734,8 +2075,8 @@ function renderTeacherSheet() {
   const connectFailed = m && !m.ok;
 
   let statusHtml;
-  if (!isAppsScript) {
-    statusHtml = `<p style="color:var(--negative);letter-spacing:0.05em;">시트 미연결 · Apps Script 배포 URL로 접속해 주세요</p>`;
+  if (state.mode === 'demo') {
+    statusHtml = `<p style="color:var(--warning);letter-spacing:0.05em;">체험 모드 · 통장 표지의 설정에서 시트를 연결하면 이 반 데이터가 저장돼요</p>`;
   } else if (connectedOk) {
     statusHtml = `<p style="color:var(--positive);letter-spacing:0.05em;">시트 연결 · <b>${escapeHTML(m.spreadsheetName||'')}</b></p>`;
   } else if (connectedNoSheets) {
@@ -1756,9 +2097,9 @@ function renderTeacherSheet() {
 
   const currentId = (m && m.spreadsheetId) || '';
 
-  const localNotice = !isAppsScript
+  const localNotice = state.mode === 'demo'
     ? `<div style="background:var(--warning-soft);color:var(--warning);padding:10px 14px;border-radius:var(--radius-sm);margin-bottom:14px;font-size:0.92em;">
-         <b>로컬 미리보기 모드</b> · file:// 또는 정적 페이지로 열렸어요. 시트와 연동되지 않으며 표시되는 데이터는 샘플입니다. 변경 사항은 새로고침하면 사라져요.
+         체험 모드예요 · 지금 만든 내용은 이 기기에만 저장돼요. 통장 표지의 설정에서 웹 앱 주소를 연결하면 구글 시트에 저장됩니다.
        </div>`
     : '';
 
@@ -1773,7 +2114,7 @@ function renderTeacherSheet() {
       <button class="btn btn-warn" onclick="doInitSheets()">시트 초기화</button>
       <button class="btn" onclick="refreshAllTeacher()">다시 확인</button>
       <button class="btn btn-secondary" onclick="runDiagnostic()">진단 새로고침</button>
-      <button class="btn" onclick="doCreateGuide()">📘 선생님 가이드 시트 다시 만들기</button>
+      <button class="btn" onclick="doCreateGuide()">사용 설명 시트 다시 만들기</button>
     </div>
 
     ${renderDiagnosticBlock()}
@@ -1789,11 +2130,6 @@ function renderTeacherSheet() {
         style="flex:1;min-width:280px;">
       <button class="btn btn-primary" onclick="saveSheetId()">연결</button>
       <button class="btn btn-ghost" onclick="clearSheetId()">초기화</button>
-    </div>
-
-    <div class="guide" style="margin-top:18px;">
-      <b>공통 활동 일괄 지정</b>
-      <p style="margin:6px 0 0;">스프레드시트의 <code>적립_활동</code> 시트에서 <b>학생이름</b> 칸을 <code>공통</code>으로 입력하면 그 활동이 모든 학생의 적립통장에 자동으로 표시돼요. 학생은 그 활동을 수정·삭제할 수 없고, 본인이 정한 활동(최대 5개)을 추가로 만들 수 있어요.</p>
     </div>
 
     <h2 style="margin-top:28px;">기능 사용 설정 (반 전체)</h2>
@@ -1827,12 +2163,12 @@ function renderTeacherSheet() {
   `;
 
   // 첫 진입 시 진단 자동 로드 (이미 있으면 skip)
-  if (inAppsScript() && !state.diagnostic) {
+  if (state.mode !== 'demo' && !state.diagnostic) {
     runDiagnostic();
   }
 }
 async function doInitSheets() {
-  if (!isAppsScript) { toast('Apps Script 웹앱에서만 동작합니다'); return; }
+  if (state.mode === 'demo') { toast('체험 모드예요 · 시트를 연결하면 사용할 수 있어요'); return; }
   toast('시트를 초기화하는 중…');
   try {
     const m = await api.initSheets();
@@ -1843,11 +2179,11 @@ async function doInitSheets() {
 }
 
 async function doCreateGuide() {
-  if (!isAppsScript) { toast('Apps Script 웹앱에서만 동작합니다'); return; }
-  toast('선생님 가이드 시트를 만드는 중…');
+  if (state.mode === 'demo') { toast('체험 모드예요 · 시트를 연결하면 사용할 수 있어요'); return; }
+  toast('사용 설명 시트를 만드는 중…');
   try {
     await api.createGuide();
-    toast('가이드 시트를 스프레드시트 맨 앞에 만들었어요!');
+    toast('사용 설명 시트를 스프레드시트 맨 앞에 만들었어요!');
   } catch(e) { toast('실패: ' + (e.message||e)); }
 }
 async function refreshAllTeacher() {
@@ -1969,7 +2305,7 @@ function renderBookSelect(root) {
       <div class="book savings ${savLocked?'locked':''}" ${savLocked?'':"onclick=\"openBook('savings')\""}>
         ${savLocked?'<div class="lockicon">잠금</div>':''}
         <div class="crest">적립</div>
-        <div class="bank-mark">우리반은행</div>
+        <div class="bank-mark">${escapeHTML(state.bankName||'스마트 통장')}</div>
         <div class="book-title">적립통장</div>
         <div class="book-sub">활동을 실천하고 포인트를 모아요</div>
         <button class="open-btn"
@@ -1981,7 +2317,7 @@ function renderBookSelect(root) {
       <div class="book allowance ${aloLocked?'locked':''}" ${aloLocked?'':"onclick=\"openBook('allowance')\""}>
         ${aloLocked?'<div class="lockicon">잠금</div>':''}
         <div class="crest">용돈</div>
-        <div class="bank-mark">우리반은행</div>
+        <div class="bank-mark">${escapeHTML(state.bankName||'스마트 통장')}</div>
         <div class="book-title">용돈기입장</div>
         <div class="book-sub">수입과 지출을 기록해요</div>
         <button class="open-btn"
@@ -2765,7 +3101,7 @@ function renderLoading() {
           <span></span><span></span>
         </div>
         <div class="content">
-          <div class="bank-display">${escapeHTML(state.bankName||'우리반은행')}</div>
+          <div class="bank-display">🏦 ${escapeHTML(state.bankName||'스마트 통장')}</div>
           <div class="bank-sub">SAVINGS · ALLOWANCE BOOK</div>
           <div class="login-form" style="margin-top:auto;">
             <p style="color:rgba(255,255,255,0.85);text-align:center;font-size:1.1em;padding:0.5em 0;">불러오는 중…</p>
@@ -2780,29 +3116,17 @@ function renderLoading() {
 // (도장 찍기·설정 변경·통계 보기·공통 활동 모두 시트에서 직접)
 
 (async () => {
+  // 연결 상태(학생용 주소 / 이 기기에 저장된 주소 / 체험)를 먼저 판별
+  detectConnection();
   renderLoading();
 
-  // 로컬(file://)·정적 호스팅이면 즉시 샘플 로드. google.script 가
-  // 늦게 주입되는 케이스만 짧게 폴링 (Apps Script 같은 신호가 있을 때만).
-  const hasGoogleStub = (typeof google !== 'undefined');
-  if (hasGoogleStub) await waitForAppsScript();
-
-  if (!inAppsScript()) {
-    console.info('[로컬 미리보기] Apps Script 가 감지되지 않아 샘플 데이터를 로드합니다.');
-    loadSampleData();
-    console.info('[로컬 미리보기] 명단:', state.roster.map(r => r.name).join(', '));
-    state.loading = false;
-    render();
-    return;
-  }
-
-  // 시트 연결이 끊겨도 메타 정보(연결 오류 상세)는 받아둬야 선생님이 진단할 수 있음.
-  // Promise.allSettled 로 각 호출의 성공/실패를 독립적으로 처리한다.
+  // 연결이면 시트에서, 체험이면 이 기기에서 초기 데이터를 받아온다.
+  // 일부가 실패해도 나머지는 살리도록 각각 독립 처리한다.
   const results = await Promise.allSettled([
-    callGSRetry('getMeta'),
-    callGSRetry('getRoster'),
-    callGSRetry('getTeacherPassword'),
-    callGSRetry('getSettings'),
+    api.getMeta(),
+    api.getRoster(),
+    api.getTeacherPassword(),
+    api.getSettings(),
   ]);
   const [metaR, rosterR, pwR, settingsR] = results;
   if (metaR.status === 'fulfilled') state.meta = metaR.value;
@@ -2811,7 +3135,7 @@ function renderLoading() {
   if (pwR.status === 'fulfilled') state.teacherPassword = pwR.value || '1234';
   if (settingsR.status === 'fulfilled') {
     state.settings = settingsR.value || state.settings;
-    state.bankName = state.settings.bankName || '우리반은행';
+    state.bankName = state.settings.bankName || state.bankName;
   }
   results.forEach((r, i) => {
     if (r.status === 'rejected') console.error('initial load[' + i + '] failed:', r.reason);

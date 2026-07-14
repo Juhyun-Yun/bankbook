@@ -1,15 +1,45 @@
 /**
- * 우리 반 통장 & 용돈기입장 — Apps Script Backend
+ * ============================================================
+ * © 2026 GEG화성 (깊이 e끌림). All rights reserved.
+ *
+ * 본 코드는 「저작권법」에 보호받는 저작물입니다.
+ * - 복제권(제16조)·공중송신권(제18조)·배포권(제20조)은
+ *   저작권자에게 있습니다.
+ * - 정당 경로로 받은 이용자라도 코드의 무단 복제·재배포·
+ *   재판매·리브랜딩은 허용되지 않습니다.
+ * - 무단 이용 시 「저작권법」 제136조(5년 이하 징역 또는
+ *   5천만 원 이하 벌금) 및 제125조(손해배상) 적용 대상이
+ *   될 수 있습니다.
+ * - 이용 문의: bacusiki777@gmail.com, for2102@jimj.kr
+ * ============================================================
+ */
+
+// 빌드 서명
+const _BUILD_SIG = 'GEGHS-DEEPE-2026';
+
+// 출처 확인용 함수
+function getBuildInfo() {
+  return {
+    sig: _BUILD_SIG,
+    owner: 'GEG화성 (깊이 e끌림)',
+    year: 2026
+  };
+}
+
+/**
+ * 스마트 통장 — Apps Script Backend
  *
  * 시트 4개 탭을 단일 진실원천으로 사용합니다.
- *  - 명단        : 이름 / 적립통장잠금 / 용돈기입장잠금 / 용돈기간시작 / 용돈기간종료
+ *  - 학생 명단   : 번호 / 이름 / 용돈기간시작 / 용돈기간종료
  *  - 적립_활동   : 학생이름 / 활동ID / 활동이름 / 시작일 / 종료일 / 회당포인트
  *  - 적립_기록   : 학생이름 / 기록ID / 날짜 / 활동이름 / 포인트 / 확인
  *  - 용돈_기록   : 학생이름 / 기록ID / 날짜 / 내용 / 금액 / 종류 / 수입종류 / 확인
  */
 
-const SHEET_GUIDE     = '선생님 가이드';
-const SHEET_ROSTER    = '명단';
+const SHEET_GUIDE     = '사용 설명';
+// 예전 안내 탭 이름들 — 있으면 정리하고 '사용 설명' 하나로 통일
+const GUIDE_LEGACY_NAMES = ['선생님 가이드', '📘 사용법', '사용법', '사용 안내', '📘 사용 설명'];
+const SHEET_ROSTER    = '학생 명단';
 const SHEET_SAVE_ACT  = '적립_활동';
 const SHEET_SAVE_REC  = '적립_기록';
 const SHEET_ALLOW_REC = '용돈_기록';
@@ -17,7 +47,7 @@ const SHEET_SETTINGS  = '설정';
 const SHEET_STATS     = '통계';
 
 const HEADERS = {
-  [SHEET_ROSTER]:    ['이름','용돈기간시작','용돈기간종료'],
+  [SHEET_ROSTER]:    ['번호','이름','용돈기간시작','용돈기간종료'],
   [SHEET_SAVE_ACT]:  ['학생이름','활동ID','활동이름','시작일','종료일','회당포인트'],
   [SHEET_SAVE_REC]:  ['학생이름','기록ID','날짜','활동이름','포인트','확인'],
   [SHEET_ALLOW_REC]: ['학생이름','기록ID','날짜','내용','금액','종류','수입종류','확인','분류','필요도'],
@@ -31,11 +61,17 @@ const DEFAULT_SETTINGS = [
   ['용돈기입장사용', true,         '체크하면 학생이 용돈기입장 기능을 사용할 수 있어요'],
 ];
 
+// 탭 표시 순서 (앞에서부터). 학생 명단 오른쪽에 통계.
+// '적립_활동'은 목록에 넣지 않고 숨긴다(적립통장이 활동을 저장하는 탭이라 삭제하지 않음).
+const SHEET_ORDER = ['사용 설명', '학생 명단', '통계', '용돈_기록', '적립_기록', '설정'];
+// 정리(삭제) 대상 군더더기 탭 — 기본 빈 시트, 예전 이름 '명단'(현재는 '학생 명단' 사용)
+const JUNK_SHEET_NAMES = ['Sheet1', 'Sheet2', 'Sheet3', '시트1', '시트2', '시트3', 'Sheet', '명단'];
+
 const PROP_PW    = 'teacher_password';
 const DEFAULT_PW = '1234';
 const PROP_BANK  = 'bank_name';
 const DEFAULT_BANK = '우리반은행';
-const PROP_SHEET_ID = '13yq2MVlRplEApfQThF8ghgj94xi7_bsD4v_USxZ9wcY';
+const PROP_SHEET_ID = 'spreadsheet_id';
 
 /* ===========================================================================
  * doGet — Apps Script 웹앱 진입점
@@ -43,11 +79,78 @@ const PROP_SHEET_ID = '13yq2MVlRplEApfQThF8ghgj94xi7_bsD4v_USxZ9wcY';
  *   (다른 선생님들과 코드는 공유하지 않고 URL만 공유할 때 사용)
  * =======================================================================*/
 function doGet(e) {
+  const p = (e && e.parameter) || {};
+  // 앱 화면(공용 주소)에서 넘어온 데이터 요청이면 데이터로 응답
+  if (p.action) return handleApi_(p);
+  // 그 외에는 기존처럼 앱 화면을 그대로 서빙 (주소를 직접 열었을 때 대비)
   return HtmlService.createHtmlOutputFromFile('Index')
-    .setTitle('우리 반 통장 & 용돈기입장')
+    .setTitle('🏦 스마트 통장')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1.0')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
+
+// 앱 화면에서 온 요청도 같은 방식으로 처리 (쓰기 포함)
+function doPost(e) {
+  const p = (e && e.parameter) || {};
+  return handleApi_(p);
+}
+
+/**
+ * 공용 주소에 올린 앱 화면과 이 스프레드시트를 이어 주는 창구.
+ * action 이름에 맞는 함수를 찾아 실행하고 결과를 돌려준다.
+ * (callback 이 있으면 그 이름으로 감싸 응답 — 다른 주소의 화면에서도 읽을 수 있게)
+ */
+function handleApi_(p) {
+  let result;
+  try {
+    const fn = API_ROUTES_[p.action];
+    if (!fn) throw new Error('알 수 없는 요청입니다: ' + p.action);
+    const args = p.args ? JSON.parse(p.args) : [];
+    result = { ok: true, data: fn.apply(null, args) };
+  } catch (err) {
+    result = { ok: false, error: (err && err.message) ? err.message : String(err) };
+  }
+  const body = JSON.stringify(result);
+  if (p.callback) {
+    return ContentService
+      .createTextOutput(p.callback + '(' + body + ')')
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return ContentService
+    .createTextOutput(body)
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// 앱 화면이 부를 수 있는 함수 목록 (기존 함수를 그대로 연결)
+const API_ROUTES_ = {
+  getMeta:               getMeta,
+  initSheets:            initSheets,
+  getRoster:             getRoster,
+  getStudentData:        getStudentData,
+  saveSavingsActivity:   saveSavingsActivity,
+  deleteSavingsActivity: deleteSavingsActivity,
+  saveSavingsRecord:     saveSavingsRecord,
+  deleteSavingsRecord:   deleteSavingsRecord,
+  setAllowancePeriod:    setAllowancePeriod,
+  saveAllowanceEntry:    saveAllowanceEntry,
+  deleteAllowanceEntry:  deleteAllowanceEntry,
+  confirmRecord:         confirmRecord,
+  getAllRecords:         getAllRecords,
+  getTeacherPassword:    getTeacherPassword,
+  setTeacherPassword:    setTeacherPassword,
+  getBankName:           getBankName,
+  setBankName:           setBankName,
+  getSpreadsheetId:      getSpreadsheetId,
+  setSpreadsheetId:      setSpreadsheetId,
+  getDiagnostic:         getDiagnostic,
+  getSettings:           getSettings,
+  setSetting:            setSetting,
+  getExpensePlan:        getExpensePlan,
+  setExpensePlan:        setExpensePlan,
+  getReflection:         getReflection,
+  setReflection:         setReflection,
+  createGuide:           createGuide,
+};
 
 /* ===========================================================================
  * 내부 유틸
@@ -82,13 +185,18 @@ function getSheet_(name) {
     sh.getRange(1, 1, 1, HEADERS[name].length)
       .setValues([HEADERS[name]])
       .setFontWeight('bold')
-      .setBackground('#FFF3E0');
+      .setBackground('#E8F1FE')
+      .setFontColor('#0F2C4D');
     sh.setFrozenRows(1);
     if (name === SHEET_SAVE_REC)  sh.getRange('F2:F').insertCheckboxes();
     if (name === SHEET_ALLOW_REC) sh.getRange('H2:H').insertCheckboxes();
     // 날짜 포맷
     if (name === SHEET_ROSTER) {
-      sh.getRange('B2:C').setNumberFormat('yyyy-mm-dd');  // 용돈기간시작/종료
+      sh.getRange('C2:D').setNumberFormat('yyyy-mm-dd');  // 용돈기간시작/종료
+      // 번호(1~30)와 기본 이름(학생1~학생30)을 미리 채운다. 선생님이 실제 이름으로 덮어쓰면 됨
+      const rosterRows = [];
+      for (let k = 1; k <= 30; k++) rosterRows.push([k, '학생' + k]);
+      sh.getRange(2, 1, rosterRows.length, 2).setValues(rosterRows);
     }
     if (name === SHEET_SAVE_ACT) {
       sh.getRange('D2:E').setNumberFormat('yyyy-mm-dd');
@@ -185,9 +293,56 @@ function getMeta() {
 
 function initSheets() {
   Object.keys(HEADERS).forEach(name => getSheet_(name));
-  try { ensureGuideSheet_(); } catch(_) {}  // 가이드 시트
-  try { ensureStatsSheet_(); } catch(_) {}  // 통계 시트 (자동 합계)
+  try { ensureRosterColumns_(); } catch(_) {}  // 명단 번호 열 보정 (A=번호, B=이름)
+  try { ensureGuideSheet_(); } catch(_) {}     // 사용 설명 탭
+  try { ensureStatsSheet_(); } catch(_) {}     // 통계 탭 (자동 합계)
+  try { arrangeSheets_(); } catch(_) {}        // 탭 순서 정리 + 군더더기 탭 삭제
   return getMeta();
+}
+
+/**
+ * 명단 탭을 A=번호, B=이름 구조로 맞춘다.
+ * 예전 사본(A=이름)이면 앞에 번호 열을 새로 넣어 이관한다.
+ */
+function ensureRosterColumns_() {
+  const sh = getSheet_(SHEET_ROSTER);
+  const a1 = String(sh.getRange(1, 1).getValue() || '').trim();
+  const b1 = String(sh.getRange(1, 2).getValue() || '').trim();
+  // 예전 구조(A열=이름)면 앞에 번호 열을 새로 넣어 이관한다
+  if (a1 === '이름' && b1 !== '이름') sh.insertColumnBefore(1);
+  // 헤더 보정 (A=번호, B=이름)
+  sh.getRange(1, 1).setValue('번호');
+  sh.getRange(1, 2).setValue('이름');
+  // 이름 칸(B2:B31)이 모두 비어 있으면 학생1~학생30을 기본으로 채운다.
+  // 실제 학생 이름이 하나라도 있으면 절대 건드리지 않는다.
+  const names = sh.getRange(2, 2, 30, 1).getValues();
+  const hasName = names.some(function(r) { return String(r[0] || '').trim() !== ''; });
+  if (!hasName) {
+    const rows = [];
+    for (let i = 1; i <= 30; i++) rows.push([i, '학생' + i]);
+    sh.getRange(2, 1, 30, 2).setValues(rows);
+  }
+}
+
+/**
+ * 군더더기 탭(기본 빈 시트·옛 안내 탭)을 삭제하고, 표준 탭을 정해진 순서로 정렬한다.
+ * 표준 7개 탭은 삭제하지 않는다.
+ */
+function arrangeSheets_() {
+  const ss = getSpreadsheet_();
+  const removeSet = JUNK_SHEET_NAMES.concat(GUIDE_LEGACY_NAMES);
+  ss.getSheets().forEach(function(s) {
+    if (removeSet.indexOf(s.getName()) >= 0 && ss.getSheets().length > 1) {
+      try { ss.deleteSheet(s); } catch(_) {}
+    }
+  });
+  SHEET_ORDER.forEach(function(name, idx) {
+    const s = ss.getSheetByName(name);
+    if (s) { s.activate(); ss.moveActiveSheet(idx + 1); }
+  });
+  // '적립_활동' 탭은 화면에서 숨긴다 (적립통장 기능이 이 탭에 활동을 저장하므로 삭제하지 않음)
+  const actSheet = ss.getSheetByName(SHEET_SAVE_ACT);
+  if (actSheet) { try { actSheet.hideSheet(); } catch(_) {} }
 }
 
 /* ===========================================================================
@@ -219,7 +374,7 @@ function ensureStatsSheet_() {
   const formulas = [];
   for (let i = 2; i <= ROWS + 1; i++) {
     formulas.push([
-      `=IFERROR(명단!A${i}, "")`,
+      `=IFERROR('학생 명단'!B${i}, "")`,
       `=IF(A${i}="", "", SUMIFS('적립_기록'!E:E, '적립_기록'!A:A, A${i}, '적립_기록'!F:F, TRUE))`,
       `=IF(A${i}="", "", SUMIFS('적립_기록'!E:E, '적립_기록'!A:A, A${i}, '적립_기록'!F:F, FALSE))`,
       `=IF(A${i}="", "", SUMIFS('용돈_기록'!E:E, '용돈_기록'!A:A, A${i}, '용돈_기록'!F:F, "income"))`,
@@ -244,7 +399,7 @@ function ensureStatsSheet_() {
 }
 
 /* ===========================================================================
- * 선생님 가이드 — 스프레드시트 맨 앞에 두고 처음 받는 선생님이 읽을 수 있게
+ * 사용 설명 — 스프레드시트 맨 앞에 두고 처음 받는 선생님이 읽을 수 있게
  * =======================================================================*/
 function createGuide() {
   return ensureGuideSheet_();
@@ -252,16 +407,18 @@ function createGuide() {
 
 function ensureGuideSheet_() {
   const ss = getSpreadsheet_();
-  let sh = ss.getSheetByName(SHEET_GUIDE);
-  if (!sh) {
-    sh = ss.insertSheet(SHEET_GUIDE, 0);  // 첫 번째 위치에 신규 생성
-  }
-  // 이미 있다면 첫 위치로 이동
-  if (sh.getIndex() > 1) {
-    sh.activate();
-    ss.moveActiveSheet(1);
-  }
-  populateGuideSheet_(sh);
+  // 예전 안내 탭(옛 이름 포함)과 기존 '사용 설명' 탭을 모두 정리한 뒤 새로 만든다.
+  // 시트가 이것들뿐이라 마지막 하나를 못 지우는 경우를 대비해 임시 탭을 먼저 만든다.
+  const removeNames = GUIDE_LEGACY_NAMES.concat([SHEET_GUIDE]);
+  const tmp = ss.insertSheet('__guide_tmp__' + Utilities.getUuid().slice(0, 4));
+  removeNames.forEach(function(nm) {
+    const s = ss.getSheetByName(nm);
+    if (s) { try { ss.deleteSheet(s); } catch(_) {} }
+  });
+  tmp.setName(SHEET_GUIDE);
+  tmp.activate();
+  ss.moveActiveSheet(1);            // 첫 번째 위치로
+  populateGuideSheet_(tmp);
   return { ok: true, name: SHEET_GUIDE };
 }
 
@@ -269,165 +426,118 @@ function populateGuideSheet_(sh) {
   sh.clear();
   sh.clearFormats();
 
-  let appUrl = '';
-  try { appUrl = ScriptApp.getService().getUrl() || ''; } catch(_) {}
+  // 앱 대표 색 (index.html 과 같은 계열)
+  const C_TITLE_TX = '#0F2C4D';
+  const C_TITLE_BG = '#E8F1FE';
+  const C_CHAP_TX  = '#0F2C4D';
+  const C_CHAP_BG  = '#E8F1FE';
+  const C_THEAD_BG = '#DCE6F2';
+  const C_ACCENT   = '#1B64DA';
+  const C_MUTED    = '#5F6B7A';
+  const C_BORDER   = '#B7C4D6';
 
-  // [본문, 스타일]  — 스타일: title / section / step / qa / null(본문)
-  const L = [];
-  const add = (text, style) => L.push([text, style || null]);
+  // 안내 내용 — 이모티콘 없이. 챕터/단계 번호는 순서대로 자동으로 매겨진다.
+  //  ['title'|'chapter'|'step'|'body'|'note'|'qa'|'thead'|'trow'|'gap', ...]
+  const spec = [
+    ['title', '스마트 통장 — 사용 설명'],
+    ['gap'],
+    ['body', '이 스프레드시트는 우리 반 학생들의 통장 데이터를 관리하는 곳입니다.'],
+    ['body', '사본을 받으신 분은 아래 순서대로 따라 하시면 우리 반 학생용 앱이 완성됩니다.'],
+    ['body', '앱 화면은 학생용이고, 선생님이 할 일은 모두 이 스프레드시트에서 합니다.'],
+    ['gap'],
 
-  add('🏦  우리반 통장 · 용돈기입장  —  사용 안내', 'title');
-  add('');
-  add('이 스프레드시트는 학생들의 통장 데이터를 관리하는 곳이에요.');
-  add('사본을 받으신 분: 아래 순서대로 따라 하시면 30분 안에 학급용 앱이 완성됩니다.');
-  add('앱은 학생 전용이고, 선생님이 할 일은 모두 이 스프레드시트에서 하세요.');
-  add('');
+    ['chapter', '처음 사용 — 기본 설정'],
+    ['step', '사본 이름 바꾸기. 좌상단 파일 이름을 우리 반 이름으로 바꿉니다. 예를 들어 2026 행복초 4학년 3반 통장처럼 적습니다.'],
+    ['step', '학생 명단 입력. 학생 명단 탭의 이름 칸에 우리 반 학생 이름을 한 줄씩 입력합니다. 용돈기간시작과 용돈기간종료는 비워 두어도 됩니다.'],
+    ['step', '설정 채우기. 설정 탭에서 은행이름을 정하고, 적립통장사용과 용돈기입장사용 체크박스로 학생이 사용할 기능을 켭니다.'],
+    ['gap'],
 
-  add('① 처음 사용 — 5분 설정', 'section');
-  add('');
-  add('1-1. 사본 이름 바꾸기', 'step');
-  add('   좌상단 파일 이름을 클릭해 우리 반 이름으로 바꿔주세요.');
-  add('   예) "2026 행복초 4학년 3반 통장"');
-  add('');
-  add('1-2. 학생 명단 입력', 'step');
-  add('   "명단" 시트의 "이름" 칸에 우리 반 학생 이름을 한 줄씩 입력.');
-  add('   용돈기간시작/종료는 비워둬도 됩니다 (학생이 앱에서 직접 설정 가능).');
-  add('');
-  add('1-3. "설정" 시트 채우기', 'step');
-  add('   • 은행이름: 학생 로그인 화면 통장에 보일 이름 (예: "우리반은행", "행복초 4-3 통장")');
-  add('   • 적립통장사용 (체크박스): 체크하면 학생이 적립통장 기능 사용 가능');
-  add('   • 용돈기입장사용 (체크박스): 체크하면 학생이 용돈기입장 기능 사용 가능');
-  add('');
-  add('1-4. (선택) 공통 활동 약정 만들기', 'step');
-  add('   모든 학생이 함께 할 활동을 선생님이 미리 정해두고 싶을 때.');
-  add('   "적립_활동" 시트에서:');
-  add('   • 학생이름 칸에 "공통" 입력 (꼭 이렇게 적어야 인식)');
-  add('   • 활동이름, 시작일, 종료일, 회당포인트 입력 (활동ID는 비워두면 자동 생성)');
-  add('   학생은 공통 활동을 수정·삭제 못 하고, 자기 활동은 5개까지 따로 만들 수 있어요.');
-  add('');
+    ['chapter', '학생용 입장 주소 만들기'],
+    ['step', '상단 메뉴에서 확장 프로그램을 눌러 Apps Script 편집기를 엽니다. 사본을 만들 때 코드가 함께 따라오므로 따로 붙여넣지 않아도 됩니다.'],
+    ['step', '편집기 오른쪽 위 배포를 눌러 새 배포를 만들고 웹 앱을 고릅니다. 실행 사용자는 나 본인으로, 액세스 권한은 모든 사람 또는 학교 계정으로 두고 배포합니다.'],
+    ['step', '처음이면 권한 검토 화면에서 본인 계정으로 허용합니다. 확인되지 않은 앱 경고가 뜨면 고급을 눌러 이동을 선택합니다. 본인이 만든 앱이라 안전합니다.'],
+    ['step', '배포가 끝나면 웹 앱 주소가 화면에 나옵니다. 이 주소를 복사해 둡니다. 이 주소가 우리 반 시트로 통하는 열쇠입니다.'],
+    ['step', '안내받은 앱 공용 주소를 브라우저에서 열고, 통장 표지 아래 설정에서 복사한 웹 앱 주소를 붙여넣어 연결합니다. 그 아래에 학생용 입장 주소가 만들어지면 복사해 학생들에게 나눠 줍니다.'],
+    ['gap'],
 
-  add('② 학생용 URL 만들기 — 처음 한 번만', 'section');
-  add('');
-  add('2-1. Apps Script 편집기 열기', 'step');
-  add('   상단 메뉴: 확장 프로그램 → Apps Script');
-  add('   (사본을 만들 때 코드가 자동으로 함께 따라왔어요 — 따로 복사·붙여넣기 안 해도 됩니다)');
-  add('');
-  add('2-2. 웹 앱으로 배포', 'step');
-  add('   Apps Script 편집기 우상단 [배포] → [새 배포]');
-  add('   톱니바퀴 ⚙ → 웹 앱');
-  add('   • 설명: 아무거나 (예: "v1")');
-  add('   • 다음 사용자 인증 정보로 실행: 나(선생님 본인)');
-  add('   • 액세스 권한이 있는 사용자: 모든 사람 (또는 학교 Google 계정)');
-  add('   [배포] 클릭');
-  add('');
-  add('2-3. 권한 승인 (처음 한 번)', 'step');
-  add('   "권한 검토" 화면이 떠요 → 본인 Google 계정 클릭');
-  add('   "Google에서 확인하지 않은 앱" 경고가 뜨면:');
-  add('   → [고급] 클릭 → [(앱 이름)(으)로 이동(안전하지 않음)] 클릭');
-  add('   본인이 직접 만든 앱이라 안전합니다.');
-  add('   → 권한 허용 → 배포 완료');
-  add('');
-  add('2-4. 학생용 URL 받기', 'step');
-  add('   "웹 앱 URL" 이 화면에 표시됩니다 (https://script.google.com/macros/s/.../exec)');
-  add('   이 URL을 학생들에게 공유 (구글 클래스룸·문자·QR코드 등).');
-  add('   학생들은 통장 표지에서 자기 이름을 선택해 입장합니다.');
-  add('');
+    ['chapter', '선생님이 할 일 — 모두 이 스프레드시트에서'],
+    ['body', '이 앱에는 선생님 모드가 없습니다. 모든 선생님 작업은 이 스프레드시트에서 직접 합니다.'],
+    ['step', '도장 찍기. 적립_기록이나 용돈_기록 탭의 확인 열 체크박스를 켜면 학생 화면에도 도장이 표시됩니다.'],
+    ['step', '설정 변경. 설정 탭에서 은행이름과 기능 사용 여부를 바꿉니다. 학생이 화면을 새로고침하면 반영됩니다.'],
+    ['step', '학급 통계 보기. 통계 탭에 학생별 합계가 자동으로 계산되어 보입니다.'],
+    ['gap'],
 
-  add('③ 선생님이 할 일 — 모두 이 스프레드시트에서', 'section');
-  add('');
-  add('이 앱에는 선생님 모드가 없어요. 모든 선생님 작업은 여기 시트에서 직접 합니다.');
-  add('');
-  add('[도장 찍기 (확인)]', 'step');
-  add('   "적립_기록" 또는 "용돈_기록" 시트의 "확인" 열 체크박스를 켜세요.');
-  add('   체크하는 순간 학생 화면에도 자동으로 도장이 표시됩니다.');
-  add('');
-  add('[설정 변경]', 'step');
-  add('   "설정" 시트에서 은행이름·기능 사용 여부를 직접 수정.');
-  add('   학생이 페이지를 새로고침해야 바뀐 값이 반영됩니다.');
-  add('');
-  add('[공통 활동 추가/수정]', 'step');
-  add('   "적립_활동" 시트에서 학생이름 칸이 "공통"인 행을 추가/수정.');
-  add('   학생 개인이 추가한 활동은 학생이름이 본인 이름으로 들어가요.');
-  add('');
-  add('[학급 통계 보기]', 'step');
-  add('   "통계" 시트에 학생별 합계가 자동으로 계산되어 보입니다.');
-  add('   (이름 · 확인 포인트 · 대기 포인트 · 총 수입 · 총 지출 · 잔액 · 기록 수)');
-  add('   명단에 학생을 새로 추가하면 자동으로 줄이 채워져요.');
-  add('');
-  add('[메뉴 도구]', 'step');
-  add('   스프레드시트 상단 메뉴 "🐷 우리반 통장 앱" 에서:');
-  add('   • 시트 초기화 (전체 탭 생성)');
-  add('   • 📘 선생님 가이드 새로고침 (이 안내 다시 만들기)');
-  add('   • 📊 통계 시트 새로고침');
-  add('');
+    ['chapter', '시트 구조 — 각 탭이 하는 일'],
+    ['thead', '탭 이름', '하는 일'],
+    ['trow', '사용 설명', '지금 보고 있는 이 안내입니다.'],
+    ['trow', '학생 명단', '우리 반 학생 이름과 선택 항목인 용돈 기간을 적습니다.'],
+    ['trow', '적립_기록', '학생이 신청한 적립 기록과 확인 체크박스가 있습니다.'],
+    ['trow', '용돈_기록', '수입과 지출 사용 내역, 분류, 필요도, 확인 체크박스가 있습니다.'],
+    ['trow', '설정', '학급 설정입니다. 은행이름과 적립통장사용, 용돈기입장사용을 둡니다.'],
+    ['trow', '통계', '학생별 합계가 자동으로 계산되는 보기 전용 탭입니다.'],
+    ['gap'],
+    ['note', '데이터나 설정을 바꿀 때는 앱 화면이 아니라 해당 시트 탭에서 직접 수정하세요. 탭 이름은 코드에 연결되어 있으므로 삭제하거나 변경하지 마세요.'],
+    ['gap'],
 
-  add('④ 시트 구조 — 각 탭이 하는 일', 'section');
-  add('');
-  add('  선생님 가이드  ← 지금 보고 계신 이 안내');
-  add('  명단         ← 학급 학생 이름과 (선택) 용돈 기간');
-  add('  적립_활동     ← 활동 약정 목록 (공통 + 학생 개인)');
-  add('  적립_기록     ← 학생이 신청한 적립 기록 + "확인" 체크박스');
-  add('  용돈_기록     ← 수입/지출 사용 내역 + 분류 + 필요도 + "확인" 체크박스');
-  add('  설정         ← 학급 설정 (은행이름, 적립통장사용, 용돈기입장사용)');
-  add('  통계         ← 학생별 합계 (자동 계산, 보기 전용)');
-  add('');
-  add('  ※ 시트 이름은 절대 바꾸지 마세요. 코드가 이 이름으로 시트를 찾습니다.');
-  add('');
+    ['chapter', '자주 묻는 질문'],
+    ['qa', '학생 화면에 이름이 안 보여요.', '학생 명단 탭의 이름 칸이 비어 있지 않은지 확인하고, 학생이 화면을 새로고침해 최신 명단을 다시 받아오게 하세요.'],
+    ['qa', '설정을 바꿨는데 학생 화면이 그대로예요.', '학생이 화면을 새로고침해야 새 설정이 반영됩니다.'],
+    ['qa', '새 학년에 다시 쓰려면요?', '이 스프레드시트를 다시 사본으로 만들어 학년별로 따로 관리하거나, 명단을 새 학생으로 바꾸고 적립_기록과 용돈_기록의 데이터를 지우세요.'],
+    ['qa', '다른 선생님께도 나눠주고 싶어요.', '이 스프레드시트 주소 끝의 edit 를 copy 로 바꾼 링크를 보내세요. 받은 분은 자기 사본을 만들고 이 안내대로 설정하면 됩니다.'],
+    ['qa', '이 안내 내용을 새로 받고 싶어요.', "상단 메뉴 '스마트 통장' 에서 사용 설명 새로고침을 누르면 이 안내가 다시 만들어집니다."],
+  ];
 
-  add('⑤ 자주 묻는 질문', 'section');
-  add('');
-  add('Q. 학생들 화면에 이름이 안 보여요.', 'qa');
-  add('   → "명단" 시트의 "이름" 칸이 비어있지 않은지 확인.');
-  add('   → 학생이 페이지 새로고침(F5)으로 최신 명단을 다시 받아옵니다.');
-  add('');
-  add('Q. 설정을 바꿨는데 학생 화면이 그대로예요.', 'qa');
-  add('   → 학생이 페이지를 새로고침해야 새 설정이 반영됩니다.');
-  add('');
-  add('Q. 새 학년에 다시 사용하려면?', 'qa');
-  add('   → 가장 깔끔한 방법: 이 스프레드시트를 또 사본 만들기 → 학년별로 따로 관리');
-  add('   → 또는: 명단을 새 학생으로 교체 + 적립_기록·용돈_기록 시트 데이터를 지움');
-  add('');
-  add('Q. 통계 시트의 숫자가 이상해요.', 'qa');
-  add('   → 메뉴 [🐷 우리반 통장 앱 → 통계 시트 새로고침] 으로 수식을 다시 만들어주세요.');
-  add('');
-  add('Q. 이 안내(가이드) 내용이 옛날 거예요. 새로 받고 싶어요.', 'qa');
-  add('   → 메뉴 [🐷 우리반 통장 앱 → 선생님 가이드 새로고침]');
-  add('');
-  add('Q. 다른 선생님께도 이 시스템을 나눠주고 싶어요.', 'qa');
-  add('   → 이 스프레드시트 URL 끝의 /edit 를 /copy 로 바꿔 그 링크를 보내주세요.');
-  add('   → 예) https://docs.google.com/spreadsheets/d/[ID]/copy');
-  add('   → 받은 분은 자기 사본을 만들고, 이 가이드 안내대로 설정하면 됩니다.');
-  add('   → 이메일 공유 같은 것 필요 없어요. 각자 자기 Google 계정 안에서만 동작합니다.');
-  add('');
-  add('Q. 코드를 직접 수정하고 싶어요.', 'qa');
-  add('   → 확장 프로그램 → Apps Script 에서 자유롭게 수정 가능합니다.');
-  add('   → 수정 후에는 [배포 → 배포 관리 → ✏ → 새 버전 → 배포] 로 반영하세요.');
-  add('');
+  // 자동 번호를 매기고 2차원 배열로 변환한다.
+  const rows = [];
+  const tags = [];
+  let chap = 0, step = 0;
+  let tableStart = -1, tableEnd = -1;
+  spec.forEach(function(item) {
+    const type = item[0];
+    let a = '', b = '';
+    if (type === 'title' || type === 'body' || type === 'note') { a = item[1]; }
+    else if (type === 'chapter') { chap++; step = 0; a = chap + '. ' + item[1]; }
+    else if (type === 'step')    { step++; a = chap + '-' + step + '. ' + item[1]; }
+    else if (type === 'qa')      { a = 'Q. ' + item[1] + '\n' + 'A. ' + item[2]; }
+    else if (type === 'thead' || type === 'trow') { a = item[1]; b = item[2]; }
+    rows.push([a, b]);
+    tags.push(type);
+    const rn = rows.length;
+    if (type === 'thead') tableStart = rn;
+    if (type === 'thead' || type === 'trow') tableEnd = rn;
+  });
 
-  // 본문 한 번에 입력
-  const values = L.map(l => [l[0]]);
-  sh.getRange(1, 1, values.length, 1).setValues(values);
+  // 본문을 한 번에 입력하고, 긴 내용은 줄바꿈으로만 처리한다(행 높이 지정하지 않음).
+  sh.getRange(1, 1, rows.length, 2).setValues(rows);
+  sh.getRange(1, 1, rows.length, 2).setWrap(true).setVerticalAlignment('top');
 
-  // 행별 스타일 적용
-  for (let i = 0; i < L.length; i++) {
+  // 행별 스타일
+  for (let i = 0; i < tags.length; i++) {
     const row = i + 1;
-    const t = L[i][1];
-    const r = sh.getRange(row, 1);
-    if (t === 'title') {
-      r.setFontSize(20).setFontWeight('bold').setBackground('#3182F6').setFontColor('#FFFFFF');
-      sh.setRowHeight(row, 52);
-    } else if (t === 'section') {
-      r.setFontSize(14).setFontWeight('bold').setBackground('#E8F1FE').setFontColor('#0F2C4D');
-      sh.setRowHeight(row, 38);
-    } else if (t === 'step') {
-      r.setFontWeight('bold').setBackground('#FFF8E1').setFontColor('#5D4500');
-    } else if (t === 'qa') {
-      r.setFontWeight('bold').setFontColor('#1B64DA');
+    const t = tags[i];
+    if (t === 'thead') {
+      sh.getRange(row, 1, 1, 2).setFontWeight('bold').setBackground(C_THEAD_BG);
+      continue;
     }
-    r.setWrap(true);
+    if (t === 'trow') continue;              // 표 본문은 테두리만
+    // 표가 아닌 줄은 두 칸을 합쳐 넓게 보여준다
+    sh.getRange(row, 1, 1, 2).merge();
+    const r = sh.getRange(row, 1);
+    if (t === 'title')        r.setFontSize(14).setFontWeight('bold').setFontColor(C_TITLE_TX).setBackground(C_TITLE_BG);
+    else if (t === 'chapter') r.setFontWeight('bold').setFontColor(C_CHAP_TX).setBackground(C_CHAP_BG);
+    else if (t === 'qa')      r.setFontColor(C_ACCENT);
+    else if (t === 'note')    r.setFontStyle('italic').setFontColor(C_MUTED);
   }
 
-  sh.setColumnWidth(1, 900);
+  // 표 전체 테두리
+  if (tableStart > 0 && tableEnd >= tableStart) {
+    sh.getRange(tableStart, 1, tableEnd - tableStart + 1, 2)
+      .setBorder(true, true, true, true, true, true, C_BORDER, SpreadsheetApp.BorderStyle.SOLID);
+  }
+
+  // 내용에 맞는 열 너비
+  sh.setColumnWidth(1, 300);
+  sh.setColumnWidth(2, 560);
   sh.setHiddenGridlines(true);
 }
 
@@ -533,6 +643,7 @@ function setSpreadsheetId(input) {
  * 명단 (Roster)
  * =======================================================================*/
 function getRoster() {
+  try { ensureRosterColumns_(); } catch(_) {}  // A=번호, B=이름 구조 자동 보정
   return rowsAsObjects_(getSheet_(SHEET_ROSTER))
     .map(r => ({
       name: String(r['이름']||'').trim(),
@@ -673,7 +784,7 @@ function setAllowancePeriod(name, start, end) {
   const nameIdx  = headers.indexOf('이름');
   const startIdx = headers.indexOf('용돈기간시작');
   const endIdx   = headers.indexOf('용돈기간종료');
-  if (nameIdx < 0) return { ok:false, error:'명단 시트에 "이름" 헤더가 없습니다.' };
+  if (nameIdx < 0) return { ok:false, error:'학생 명단 시트에 "이름" 헤더가 없습니다.' };
 
   let rowIdx = -1;
   for (let i = 1; i < data.length; i++) {
@@ -862,10 +973,10 @@ function setBankName(name) {
  * =======================================================================*/
 function onOpen() {
   SpreadsheetApp.getUi()
-    .createMenu('🐷 우리반 통장 앱')
+    .createMenu('🏦 스마트 통장')
     .addItem('시트 초기화 (전체 탭 생성)', 'initSheets')
-    .addItem('📘 선생님 가이드 새로고침', 'createGuide')
-    .addItem('📊 통계 시트 새로고침', 'createStats')
+    .addItem('사용 설명 새로고침', 'createGuide')
+    .addItem('통계 시트 새로고침', 'createStats')
     .addSeparator()
     .addItem('비밀번호 초기화 (1234)', 'resetPasswordToDefault_')
     .addToUi();
